@@ -1,5 +1,7 @@
-import numpy as np
 import os
+
+import numpy as np
+
 from translated import *
 from metasolve import *
 
@@ -8,7 +10,7 @@ def mirrorIndex(i, recs):
     if recs % 2 == 1:
         return i
     else:
-        return 5 - i
+        return (7-i) % 6
 def matchIndex(i):
     return (i + 3) % 6
 def matchPos(c1, c2):
@@ -109,7 +111,10 @@ def drawStates(adj,uni, filename, drawSpectrum=False, drawIndivs=False, drawBand
     if S_mat is None:
         e_values, e_vec = np.linalg.eigh(adj)
     else:
-        e_values, e_vec = scipy_eigh(adj,S_mat)
+        sparseTAdj = csc_matrix(adj)
+        sparseS = csc_matrix(S_mat)
+        e_values, e_vec = scipy_eigsh(sparseTAdj,M=sparseS)
+        # e_values, e_vec = scipy_eigh(adj,S_mat)
     idx = e_values.argsort()[::-1]
     e_values = e_values[idx]
     e_vec = e_vec[:, idx]
@@ -141,7 +146,7 @@ def drawStates(adj,uni, filename, drawSpectrum=False, drawIndivs=False, drawBand
         plt.savefig(filename + "\\" + filename + "_EigVals.pdf")
         plt.cla()
     if makeIndivGraphs:
-        for i in range(lowE, highE):
+        for i in range(lowE, min(highE,200)):
             plt.close()
             figi, axi = plt.subplots(1, 1)
             for j in range(vertnum):
@@ -220,15 +225,16 @@ if solveBalancedPatch:
     exit()
 # REQUIRED: Generate Hexagons into "centers" (tuple:(center,label,orientation)) list, "adj" adjacency matrix (indexed by centers)
 superTileType = "Psi"
-recursions = 3  # MUST BE ODD
+recursions = 3
 doWrap = False  # wraparound edges
 wrapConnect = True  # actually connect tiles
 
-showEdgeLabels = True
+showEdgeLabels = False
 yesRotate = True
 showPatchOnly = True
-showHexagons = False
-showVertices = True
+showHexagons = True
+showVertices = False
+hexOnly = False  # skips over vertex operations that slow down massive hex grids
 
 doProjections = True
 drawProjectors = False  # Writes
@@ -239,8 +245,7 @@ stateName = "States_Patch5_N10.pkl"  # if true what name it loads in to compare
 N_vals = 15
 
 doA2222Scheme = False
-
-
+hexTB = False
 
 doVertexStates = False  # Writes
 doSpectrum = True
@@ -248,30 +253,7 @@ doIndivs = True
 doBands = True
 stateNum = 15  # number of individual states to draw
 bandList = [1, 4, 8, 16, 24, 32]
-iList = 5
 
-if iList == 0:
-    ind_list = [450, 456, 471, 449, 451, 470, 469, 463, 113]  # WORKING LIST FOR DELTA TILE
-elif iList == 1:
-    ind_list = [102, 118, 112, 120, 121, 101, 471, 71, 95, 449, 470, 119, 115, 469, 117, 457, 113, 111]  # WORKING LIST FOR DELTA TILE
-elif iList == 2:  # 2
-    ind_list = [450, 449]
-elif iList == 3:  # line zig zag
-    ind_list = [466, 469, 113, 457, 111, 459, 125, 124, 69, 70, 64, 237, 244, 221]
-elif iList == 4:  # 7 patch center of 5, 9
-    # ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452] only outsides of 7 patch
-    ind_list = [451, 462, 461, 464, 449, 450, 463]
-elif iList == 5:  # hexagon patch (4 is just the inside)
-    ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452, 451, 462, 461, 464, 449, 450, 463]
-elif iList == 6:  # straight line
-    ind_list = [438, 439, 443, 255, 256, 258, 313, 314, 308, 307, 304, 68]
-elif iList == 7:  # etas + surroundings (7patch)
-    ind_list = [457, 111, 112, 113, 114, 115, 118]
-elif iList == 8:
-    ind_list = [457, 111]
-elif iList == 9:
-    ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452, 451, 462, 461, 464, 449, 450, 463,
-                312,311,309,284,307,301,302,459,111,112,113,469,472,491,455,454,257,258]
 # hexagon generation and display of hexagons (adjacency matrix in adj, others in centers = (position, name, orientation)
 if True:
     matplotlib.rcParams.update(matplotlib.rcParamsDefault)
@@ -303,6 +285,47 @@ if True:
                 # Verifies that edges match up
                 # , i1 = matchPos(centerxy1, centerxy2)
                 # print(edge_dict[label1][mirrorIndex((-orient1+i1+6)%6,recursions)],edge_dict[label2][mirrorIndex((-orient2+j1+6)%6,recursions)])
+
+iList = 5
+if iList == 0:
+    ind_list = [450, 456, 471, 449, 451, 470, 469, 463, 113]  # WORKING LIST FOR DELTA TILE
+elif iList == 1:
+    ind_list = [102, 118, 112, 120, 121, 101, 471, 71, 95, 449, 470, 119, 115, 469, 117, 457, 113, 111]  # WORKING LIST FOR DELTA TILE
+elif iList == 2:  # 2
+    ind_list = [450, 449]
+elif iList == 3:  # line zig zag
+    ind_list = [466, 469, 113, 457, 111, 459, 125, 124, 69, 70, 64, 237, 244, 221]
+elif iList == 4:  # 7 patch center of 5, 9
+    # ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452] only outsides of 7 patch
+    ind_list = [451, 462, 461, 464, 449, 450, 463]
+elif iList == 5:  # hexagon patch (4 is just the inside)
+    ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452, 451, 462, 461, 464, 449, 450, 463]
+elif iList == 6:  # straight line
+    ind_list = [438, 439, 443, 255, 256, 258, 313, 314, 308, 307, 304, 68]
+elif iList == 7:  # etas + surroundings (7patch)
+    ind_list = [457, 111, 112, 113, 114, 115, 118]
+elif iList == 8:
+    ind_list = [457, 111]
+elif iList == 9:
+    ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452, 451, 462, 461, 464, 449, 450, 463,
+                312,311,309,284,307,301,302,459,111,112,113,469,472,491,455,454,257,258]
+elif iList == 10:
+    h = 1.9
+    k = 17.4
+    r = 8
+elif iList == 11:
+    h = 40
+    k = 27.5
+    r = 22
+if iList >= 10:
+    ind_list = []
+    for i in range(len(centers)):
+        pos = centers[i][0]
+        if np.sqrt(np.square(pos[0] - h) + np.square(pos[1] - k)) < r:
+            ind_list.append(i)
+    print(ind_list)
+
+
 if iList <= 1:
     print("Verifying edge balances...")
     print(computeEdgeBalancePatch(ind_list))
@@ -334,7 +357,7 @@ if True:
                 match_edges[edgeI].append((i, oriI1))
             else:
                 if "+" in edgeI or noDupEta(i, oriI1, edgeI, matches):
-                    matches.append(((i, oriI1), (one, (j1 - oriJ + 6) % 6)))
+                    matches.append(((i, oriI1), (one, mirrorIndex((j1 - oriJ + 6) % 6,recursions))))
     normal_edges = len(matches)
     # finding wraparounds is applicable
     if doWrap and checkBal(computeEdgeBalancePatch(ind_list)):
@@ -345,133 +368,138 @@ if True:
                     matches.append((edge, match_edges[match_dict[key]][total - 1 - i]))
                 if "+" in key:
                     matches.append((edge, match_edges[match_dict[key]][total - i - 1]))
-    # FULL ADJACENCY CONSTRUCTION
-    all_unique = {}
-    all_adj = {}
-    tile_sizes = {}  # size of each TYPE of tile (Gamma, Delta,...)
-    for key in tile_names:
-        with open('UniqueAdj_' + tile_names[key] + '.pkl', 'rb') as f:
-            hu, ha = pickle.load(f)
-            all_unique[tile_names[key]] = hu
-            all_adj[tile_names[key]] = ha
-            tile_sizes[tile_names[key]] = len(hu)
-    # the block diagonal sizes of each tile IN THE PATCH
-    size_list = []
-    blockoffsets = []
-    holdOffset = 0
-    for ind in ind_list:
-        s1 = tile_sizes[centers[ind][1]]
-        size_list.append(s1)
-        blockoffsets.append(holdOffset)
-        holdOffset += s1
-    print("Block diagonal sizes:",size_list)
-    # build vertex list in the correct locations (includes duplicates), labelled in same index order as totalAdj
-    totalVertices = [np.array(all_unique[centers[ind_list[0]][1]])]  # starting
-    for loop in range(len(ind_list) - 1):
-        totalVertices.append([])
-    locked = [False] * len(ind_list)
-    locked[0] = True
-    while not all(locked):
-        for match in matches:
-            # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
-            m1, m2 = match
-            i1, o1 = m1
-            l1 = ind_list.index(i1)
-            t1 = centers[i1][1]
-            e1 = edge_dict[t1][o1]
-            p1 = edge_index_dict[t1][o1]
-            block1 = blockoffsets[l1]
-            i2, o2 = m2
-            l2 = ind_list.index(i2)
-            t2 = centers[i2][1]
-            e2 = edge_dict[t2][o2]
-            p2 = edge_index_dict[t2][o2]
-            block2 = blockoffsets[ind_list.index(i2)]
-            if (locked[l1] and locked[l2]) or (not locked[l1] and not locked[l2]):
-                continue
-            # f1 is anchor, f2 is moved
-            if locked[l1]:
-                f1 = i1
-                f2 = i2
-            else:
-                f1 = i2
-                f2 = i1
-                l1, l2 = l2, l1
-                p1, p2 = p2, p1
-                t1, t2 = t2, t1
-            locked[l2] = True
-            shiftVertices = all_unique[t2]
-            if e2 == "eta":
-                p2 = list(reversed(p2))
-            newpoints = align_shapes(totalVertices[l1], shiftVertices, p1[0], p1[1], p2[0], p2[1])
-            totalVertices[l2] = newpoints
-            if all(locked):
-                break
-    totalVertices = np.vstack(totalVertices)
-    print("Vertex Count (duplicates)", len(totalVertices))
-    # Build block diagonal
-    totalSize = sum(size_list)
-    totalAdj = np.zeros((totalSize, totalSize))
-    rollingIndex = 0
-    for i, ind in enumerate(ind_list):
-        tileName = centers[ind][1]
-        blockSize = size_list[i]
-        totalAdj[rollingIndex:rollingIndex + blockSize, rollingIndex:rollingIndex + blockSize] = all_adj[tileName]
-        rollingIndex += blockSize
-    # Cross connect across block diagonals (all in matchlist)
-    newmap = dict()
-    if wrapConnect:
-        for match in matches:
-            # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
-            m1, m2 = match
-            i1, o1 = m1
-            t1 = centers[i1][1]
-            e1 = edge_dict[t1][o1]
-            p1 = edge_index_dict[t1][o1]
-            block1 = blockoffsets[ind_list.index(i1)]
-            i2, o2 = m2
-            t2 = centers[i2][1]
-            e2 = edge_dict[t2][o2]
-            p2 = edge_index_dict[t2][o2]
-            block2 = blockoffsets[ind_list.index(i2)]
-            print("Edge Connection: ", t1, e1, t2, e2)
-            if e2 == "eta":
-                p2 = list(reversed(p2))
-            # fix adjacency matrix
-            for j in range(len(p1)):  # k is overwritten
-                h, k = (block1 + p1[j], block2 + p2[j])
-                while h in newmap:
-                    conns = np.where((totalAdj[h] == 1))[0]
-                    for con in conns:
-                        ncon = con
-                        while ncon in newmap:
-                            ncon = newmap[ncon]
-                        totalAdj[con][h] = 0
-                        totalAdj[h][con] = 0
-                        totalAdj[ncon][newmap[h]] = 1
-                        totalAdj[newmap[h]][ncon] = 1
-                    h = newmap[h]
-                while k in newmap:
-                    conns = np.where((totalAdj[k] == 1))[0]
-                    for con in conns:
-                        ncon = con
-                        while ncon in newmap:
-                            ncon = newmap[ncon]
-                        totalAdj[con][k] = 0
-                        totalAdj[k][con] = 0
-                        totalAdj[ncon][newmap[k]] = 1
-                        totalAdj[newmap[k]][ncon] = 1
-                    k = newmap[k]
-                k_indices = np.where((totalAdj[k] == 1))[0]
-                newmap[k] = h
-                for one in k_indices:
-                    totalAdj[k][one] = 0
-                    totalAdj[one][k] = 0
-                    totalAdj[one][h] = 1
-                    totalAdj[h][one] = 1
-    print("Symmetric:", np.allclose(totalAdj, totalAdj.T))
+    if not hexOnly:
+        # FULL ADJACENCY CONSTRUCTION
+        all_unique = {}
+        all_adj = {}
+        tile_sizes = {}  # size of each TYPE of tile (Gamma, Delta,...)
+        for key in tile_names:
+            with open('UniqueAdj_' + tile_names[key] + '.pkl', 'rb') as f:
+                hu, ha = pickle.load(f)
+                all_unique[tile_names[key]] = hu
+                all_adj[tile_names[key]] = ha
+                tile_sizes[tile_names[key]] = len(hu)
+        # the block diagonal sizes of each tile IN THE PATCH
+        size_list = []
+        blockoffsets = []
+        holdOffset = 0
+        for ind in ind_list:
+            s1 = tile_sizes[centers[ind][1]]
+            size_list.append(s1)
+            blockoffsets.append(holdOffset)
+            holdOffset += s1
+        print("Block diagonal sizes:", size_list)
+        # build vertex list in the correct locations (includes duplicates), labelled in same index order as totalAdj
+        totalVertices = [np.array(all_unique[centers[ind_list[0]][1]])]  # starting
+        for loop in range(len(ind_list) - 1):
+            totalVertices.append([])
+        locked = [False] * len(ind_list)
+        locked[0] = True
+        while not all(locked):
+            for match in matches:
+                # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
+                m1, m2 = match
+                i1, o1 = m1
+                l1 = ind_list.index(i1)
+                t1 = centers[i1][1]
+                e1 = edge_dict[t1][o1]
+                p1 = edge_index_dict[t1][o1]
+                block1 = blockoffsets[l1]
+                i2, o2 = m2
+                l2 = ind_list.index(i2)
+                t2 = centers[i2][1]
+                e2 = edge_dict[t2][o2]
+                p2 = edge_index_dict[t2][o2]
+                block2 = blockoffsets[ind_list.index(i2)]
+                if (locked[l1] and locked[l2]) or (not locked[l1] and not locked[l2]):
+                    continue
+                # f1 is anchor, f2 is moved
+                if locked[l1]:
+                    f1 = i1
+                    f2 = i2
+                else:
+                    f1 = i2
+                    f2 = i1
+                    l1, l2 = l2, l1
+                    p1, p2 = p2, p1
+                    t1, t2 = t2, t1
+                locked[l2] = True
+                shiftVertices = all_unique[t2]
+                if e2 == "eta":
+                    p2 = list(reversed(p2))
+                newpoints = align_shapes(totalVertices[l1], shiftVertices, p1[0], p1[1], p2[0], p2[1])
+                totalVertices[l2] = newpoints
+                if all(locked):
+                    break
+        totalVertices = np.vstack(totalVertices)
+        print("Vertex Count (duplicates)", len(totalVertices))
+        # Build block diagonal
+        totalSize = sum(size_list)
+        totalAdj = np.zeros((totalSize, totalSize))
+        rollingIndex = 0
+        for i, ind in enumerate(ind_list):
+            tileName = centers[ind][1]
+            blockSize = size_list[i]
+            totalAdj[rollingIndex:rollingIndex + blockSize, rollingIndex:rollingIndex + blockSize] = all_adj[tileName]
+            rollingIndex += blockSize
+        # Cross connect across block diagonals (all in matchlist)
+        newmap = dict()
+        if wrapConnect:
+            for match in matches:
+                # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
+                m1, m2 = match
+                i1, o1 = m1
+                l1 = ind_list.index(i1)
+                t1 = centers[i1][1]
+                mi1 = mirrorIndex(o1, recursions)
+                e1 = edge_dict[t1][o1]
+                p1 = edge_index_dict[t1][o1]
+                block1 = blockoffsets[l1]
+                i2, o2 = m2
+                l2 = ind_list.index(i2)
+                t2 = centers[i2][1]
+                mi2 = mirrorIndex(o2, recursions)
+                e2 = edge_dict[t2][o2]
+                p2 = edge_index_dict[t2][o2]
+                block2 = blockoffsets[l2]
+                print("Edge Connection: ", i1, t1, e1, i2, t2, e2)
+                if e2 == "eta":
+                    p2 = list(reversed(p2))
+                # fix adjacency matrix
+                for j in range(len(p1)):  # k is overwritten
+                    h, k = (block1 + p1[j], block2 + p2[j])
+                    while h in newmap:
+                        conns = np.where((totalAdj[h] == 1))[0]
+                        for con in conns:
+                            ncon = con
+                            while ncon in newmap:
+                                ncon = newmap[ncon]
+                            totalAdj[con][h] = 0
+                            totalAdj[h][con] = 0
+                            totalAdj[ncon][newmap[h]] = 1
+                            totalAdj[newmap[h]][ncon] = 1
+                        h = newmap[h]
+                    while k in newmap:
+                        conns = np.where((totalAdj[k] == 1))[0]
+                        for con in conns:
+                            ncon = con
+                            while ncon in newmap:
+                                ncon = newmap[ncon]
+                            totalAdj[con][k] = 0
+                            totalAdj[k][con] = 0
+                            totalAdj[ncon][newmap[k]] = 1
+                            totalAdj[newmap[k]][ncon] = 1
+                        k = newmap[k]
+                    k_indices = np.where((totalAdj[k] == 1))[0]
+                    newmap[k] = h
+                    for one in k_indices:
+                        totalAdj[k][one] = 0
+                        totalAdj[one][k] = 0
+                        totalAdj[one][h] = 1
+                        totalAdj[h][one] = 1
+        print("Symmetric:", np.allclose(totalAdj, totalAdj.T))
 # DRAWING the points
-if showVertices:
+if not hexOnly and showVertices:
     def get_col(ind):
         for i, block in enumerate(blockoffsets):
             if ind < block:
@@ -541,15 +569,15 @@ if doA2222Scheme:
     sy["t_z"] = t_z
     sy["t_t"] = t_t
     sy["t_eta"] = t_eta
-    sy["e_Gamma"] = e_Gamma
-    sy["e_Delta"] = e_Delta
-    sy["e_Theta"] = e_Theta
-    sy["e_Lambda"] = e_Lambda
-    sy["e_Xi"] = e_Xi
-    sy["e_Pi"] = e_Pi
-    sy["e_Sigma"] = e_Sigma
-    sy["e_Phi"] = e_Phi
-    sy["e_Psi"] = e_Psi
+    sy["e_Gamma"] = e_Gamma#
+    sy["e_Delta"] = e_Gamma#e_Delta
+    sy["e_Theta"] = e_Gamma#e_Theta
+    sy["e_Lambda"] = e_Gamma#e_Lambda
+    sy["e_Xi"] = e_Gamma#e_Xi
+    sy["e_Pi"] = e_Gamma#e_Pi
+    sy["e_Sigma"] = e_Gamma#e_Sigma
+    sy["e_Phi"] = e_Gamma#e_Phi
+    sy["e_Psi"] = e_Gamma#e_Psi
     conndict = dict()
     for i in tile_names:
         conndict[tile_names[i]] = []
@@ -596,6 +624,14 @@ if doA2222Scheme:
         derivatives = [[-eq.lhs.diff(var) + eq.rhs.diff(var) for var in variables] for eq in eqs]
         def calculate_equations(variables):
             E, Gamma, Delta, Theta, Lambda, Xi, Pi, Sigma, Phi, Psi, t_a, t_b, t_g, t_d, t_ep, t_z, t_t, t_eta, e_Gamma, e_Delta, e_Theta, e_Lambda, e_Xi, e_Pi, e_Sigma, e_Phi, e_Psi,NullOne,NullOne,NullOne,NullOne,NullOne,NullOne,NullOne,NullOne,NullOne,NullOne = variables
+            e_Delta = e_Gamma
+            e_Theta = e_Gamma
+            e_Lambda = e_Gamma
+            e_Xi = e_Gamma
+            e_Pi = e_Gamma
+            e_Sigma = e_Gamma
+            e_Phi = e_Gamma
+            e_Psi = e_Gamma
             eqs = [
                 Gamma * (E - e_Gamma) - Delta * t_g - Phi * t_b - Pi * t_a - Psi * t_a - Sigma * t_d - Xi * t_b,
                 Gamma * (E - e_Gamma) - Delta * t_g - Lambda * t_a - Phi * t_b - Sigma * t_d - Theta * t_b - Xi * t_a,
@@ -642,16 +678,20 @@ if doA2222Scheme:
             current_derivatives = np.array(
                 [[derivative(*values) for derivative in row] for row in numerical_derivatives])
             return current_derivatives
-        initial_guess = [90.0] * 27
-        initial_guess[0]=1
+        initial_guess = [2.0] * 27
+        initial_guess[0] = -1
+        # initial_guess.extend([random.uniform(5, 10) for _ in range(17)])
+        # initial_guess[0]=1
         initial_guess.extend([0]*10)
-        solutions2 = fsolve(calculate_equations, initial_guess,xtol=1e-9,fprime=jacobian_function)
+        print(initial_guess)
+        solutions2 = fsolve(calculate_equations, initial_guess,xtol=1e-8,fprime=jacobian_function)
+        print(calculate_equations(solutions2))
         for i, value in enumerate(solutions2):
             variable_name = \
-            ["E","Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Phi", "Psi", "t_a", "t_b", "t_g", "t_d", "t_ep",
+            ["E", "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Phi", "Psi", "t_a", "t_b", "t_g", "t_d", "t_ep",
              "t_z", "t_t", "t_eta", "e_Gamma", "e_Delta", "e_Theta", "e_Lambda", "e_Xi", "e_Pi", "e_Sigma", "e_Phi",
-             "e_Psi","Null1","Null1","Null1","Null1","Null1","Null1","Null1","Null1","Null1","Null1"][i]
-            print(f"{variable_name} =", value)
+             "e_Psi", "Null1", "Null1", "Null1", "Null1", "Null1", "Null1", "Null1", "Null1", "Null1", "Null1"][i]
+            print(f"{variable_name} =", np.round(value,4))
         '''
         initial_guess = [90.0] * 27
         initial_guess[0]=1
@@ -683,19 +723,73 @@ if doA2222Scheme:
         e_Sigma = 2.0549292858973365
         e_Phi = 0.36268808276034625
         e_Psi = 0.25169216893677504'''
+if hexTB:
+    Hhex = np.zeros((len(ind_list),len(ind_list)))
+    scheme = 2
+    onsite = 0#-8.2176
+    # a_ep = 1.8778
+    # gdte = 2.1206
+    # bz = 1.635
+    # a_ep = .85
+    # bz = .65
+    # gdte = 1.1
+    a_ep = 1
+    bz = 1
+    gdte = 1
+    edge_binds = {
+        'a+': a_ep,
+        'a-': a_ep,
+        'b+': bz,
+        'b-': bz,
+        'g+': gdte,
+        'g-': gdte,
+        'd+': gdte,
+        'd-': gdte,
+        'ep+': a_ep,
+        'ep-': a_ep,
+        'z+': bz,
+        'z-': bz,
+        't+': gdte,
+        't-': gdte,
+        'eta': gdte}
+    for match in matches:
+        m1, m2 = match
+        i1, o1 = m1
+        l1 = ind_list.index(i1)
+        t1 = centers[i1][1]
+        e1 = edge_dict[t1][o1]
+        i2, o2 = m2
+        l2 = ind_list.index(i2)
+        t2 = centers[i2][1]
+        e2 = edge_dict[t2][o2]
+        Hhex[l1,l2] = edge_binds[e1]
+        Hhex[l2, l1] = edge_binds[e2]
+    verts = []
+    for i,ind in enumerate(ind_list):
+        Hhex[i,i] = onsite
+        verts.append(centers[ind][0])
+    print("Hhex Symmetric:",np.allclose(Hhex,Hhex.T))
+    print("Number of metatiles:",len(ind_list))
+    fname = "HexStates" + str(iList)+"_"+str(onsite)+"_" + str(bz)+"_" + str(a_ep)+"_" + str(gdte)
+    drawStates(Hhex,verts,fname,True,True,True,highE=(len(ind_list)-1),bandsIn=[1,30,50,100,150])
+
+
 
 # SHOW PROJECTED STATES
 # build projection matrices and find states (solve PiHPi |psi> = E|psi>)
 if doProjections:
+    verifyProjectors = False
+
     projectors = dict()
     projectSpectra = dict()
     projectStates = dict()
     # find states that are not referenced at all, used to verify the identity matrix (otherwise would be 0 and fail), basically the overwritten vertices
-    deadStates = [0]*totalSize
-    for i in range(totalSize):
-        if i in newmap:
-            deadStates[i] = 1
-    deadStates = np.diag(deadStates)
+    if verifyProjectors:
+        deadStates = [0]*totalSize
+        for i in range(totalSize):
+            if i in newmap:
+                deadStates[i] = 1
+        deadStates = np.diag(deadStates)
     # build projection matrix for each block and store in projectors[ind], projectSpectra[ind], projectStates[ind]
     # also draw each projector and its eigenstates as desired
     for i, ind in enumerate(ind_list):
@@ -720,15 +814,16 @@ if doProjections:
             drawStates(Hmod, totalVertices, "Projector_Patch" + str(iList) + "_Tile" + str(ind) + "_" + centers[ind][1],
                        doSpectrum, doIndivs, doBands, [1, 4, 8], lowE=0, highE=N_vals)
     # verify rules for summation to identity
-    sum = np.zeros((totalSize,totalSize))
-    for i, indi in enumerate(ind_list):
-        Pi = projectors[indi]
-        sum += projectors[indi]
-        for j, indj in enumerate(ind_list):
-            if j < i:
-                sum -= np.dot(projectors[indi], projectors[indj])
-    sum += deadStates  # correct for null basis
-    print("Projectors (with nonortho correction) add to identity: ",np.allclose(sum,np.eye(totalSize)))
+    if verifyProjectors:
+        sum = np.zeros((totalSize,totalSize))
+        for i, indi in enumerate(ind_list):
+            Pi = projectors[indi]
+            sum += projectors[indi]
+            for j, indj in enumerate(ind_list):
+                if j < i:
+                    sum -= np.dot(projectors[indi], projectors[indj])
+        sum += deadStates  # correct for null basis
+        print("Projectors (with nonortho correction) add to identity: ",np.allclose(sum,np.eye(totalSize)))
     # find <psi_i|H|psi_j> =t_matrix, S matrix for all ground-->N states and then diagonalize all of it (diagonal blocks are energies on diag and 0 otherwise because orthonormal)
     t_matrix = np.zeros((N_vals*len(ind_list), N_vals*len(ind_list)))
     overlapMatrix = np.zeros((N_vals*len(ind_list), N_vals*len(ind_list)))
@@ -740,7 +835,7 @@ if doProjections:
                     psi_j = projectStates[indj][:, kj]
                     overlapMatrix[i*N_vals+ki,j*N_vals+kj] = np.dot(np.conjugate(psi_i),psi_j)
                     t_matrix[i*N_vals+ki,j*N_vals+kj] = np.dot(np.conjugate(psi_i), np.dot(totalAdj, psi_j))
-    t_matrix[t_matrix < 1e-4] =  0  # kills small values
+    t_matrix[t_matrix < 1e-4] = 0  # kills small values
     # graphically display each
     filename = "MetaProject_Patch" + str(iList) + "_N" + str(N_vals)
     if drawProjectors:
@@ -770,8 +865,6 @@ if doProjections:
             uni_t[i] = np.array([pos[0] * 5, pos[1] * 5 + shift * (i % N_vals)])
         drawStates(t_matrix,uni_t,filename,doSpectrum, doIndivs, doBands, [1, min(4,len(ind_list)), min(8,len(ind_list))], lowE=0, highE=min(20,len(t_matrix)), S_mat=overlapMatrix)
     if computeOverlap:
-
-
         # tile eigenstates are in projectStates, projectSpectrum
         # <psi_tot|psi_{alpha}_{J}> = sum_i(sum_J(sum_alpha(<psi_tot|i><i|phi_j_alpha><phi_j_alpha|psi_tile>)))
         # compute the meta spectrum/states
@@ -782,12 +875,13 @@ if doProjections:
 
         doBenchmarking = False # benchmarks on totalAdj
         if doBenchmarking:
-            sparseTAdj = csc_matrix(totalAdj)
+
             start_time = time.time()
             eigenvalues_dense, eigvecs = scipy_eigh(totalAdj)
             end_time = time.time()
             print("Dense diagonalization time:\t"+str(end_time - start_time))
             start_time = time.time()
+            sparseTAdj = csc_matrix(totalAdj)
             eigenvalues_sparse, eigvecs = scipy_eigsh(sparseTAdj)
             end_time = time.time()
             print("Sparse diagonalization time:\t"+str(end_time - start_time))
@@ -797,7 +891,7 @@ if doProjections:
         totalSpectrum = e_values[idx]
         totalStates = e_vecs[:,idx]
 
-        doSanityChecks = False
+        doSanityChecks = True
         if doSanityChecks:
             print("Sanity Check 1")
             for state in range(1):
@@ -812,20 +906,34 @@ if doProjections:
                 for n in range(1):
                     for m in range(N_vals):
                         print("<Phi_tot_"+str(n)+"|Psi_"+centers[ind][1]+"_" + str(m) + ">: "+ str(np.round(np.dot(np.conj(projectStates[ind][:,m]),totalStates[:,n]),3)))
+            print("Determine if hoppings are the same")
+            for match in matches:
+                # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
+                m1, m2 = match
+                i1, o1 = m1
+                l1 = ind_list.index(i1)
+                t1 = centers[i1][1]
+                e1 = edge_dict[t1][o1]
+                i2, o2 = m2
+                l2 = ind_list.index(i2)
+                t2 = centers[i2][1]
+                e2 = edge_dict[t2][o2]
+                centerxyI,labelI,oriI = centers[i1]
+                centerxyJ,labelJ,oriJ = centers[i2]
+                for n in range(N_vals):
+                    print(str(n)+": <" + labelI + str(i1)+"|H_tot|" + labelJ + str(i2)+">",e1,np.round(t_matrix[l1 * N_vals+n, l2 * N_vals+n], 4))
+                #print(np.trace(np.dot(projectors[i1],projectors[i2])))
         print("Hypothesis Testing:"+str(iList))
         for ind in ind_list:
-            for state in range(1):
-                m = 0
-                val1 = np.round(np.square(np.dot(np.conj(projectStates[ind][:,m]),totalStates[:,state])),3)
-                Psi_tot = totalStates[:,state]
+            for state in range(3):
                 P_tile = projectors[ind]
-                H = np.dot(np.dot(P_tile, totalAdj), P_tile) # Pi H Pi (totalAdj is H_tot)
-                val2 = np.round(np.dot(np.conjugate(Psi_tot), np.dot(H, Psi_tot))/totalSpectrum[state],3)
-                print(ind,val1,val2)
-        for i,indi in enumerate(ind_list):
-            for j,indj in enumerate(ind_list):
-                if i != j:
-                    pass
+                Psi_tot = totalStates[:,state]
+                H = np.dot(np.dot(P_tile, totalAdj), P_tile)  # Pi H Pi (totalAdj is H_tot)
+                val2 = np.round(np.dot(np.conjugate(Psi_tot), np.dot(H, Psi_tot)) / totalSpectrum[state], 3)
+                for m in range(3):
+                    val1 = np.round(np.square(np.dot(np.conj(projectStates[ind][:,m]),totalStates[:,state])),3)
+                    print("Tile Index:"+str(ind)+"\tState:"+str(state)+"\tNval:"+str(m)+"\t\t"+str(val1)+"\t"+str(val2))
+
 
         state = 0
         Tform = np.zeros((len(totalVertices),len(ind_list)*N_vals))

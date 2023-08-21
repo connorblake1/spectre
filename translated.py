@@ -19,6 +19,7 @@ from collections import namedtuple
 from matplotlib.artist import Artist
 import matplotlib.transforms as mtransforms
 import matplotlib.patches as patches
+import random
 ident = [1,0,0,0,1,0]
 s32 = np.sqrt(3) / 2
 rad = 1
