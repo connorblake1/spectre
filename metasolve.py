@@ -3,6 +3,7 @@ from scipy.optimize import fsolve
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+# functions to get lists of previously generated neighors in A2222/A22.22.22.23 schemes
 def get_meta_metalist(ind):
     if ind == 2:
         return get_metalist2()
@@ -148,6 +149,7 @@ def get_metalist3():
              ['A_22_23_323', 'B_22_322_322', 'B_22_323', 'B_322_323']],
             [['A_22_22_22_22', 'B_22_4222', 'B_22_4222', 'B_23_4222', 'B_23_4222'],
              ['A_22_22_22_23', 'B_22_4222', 'B_22_4222', 'B_23_4222', 'B_322_4222']]]
+# critical functionalities used in other programs for evaluating arrangements of points
 def angle_between_points(p1, p2):
     return np.arctan2(p2[1] - p1[1], p2[0] - p1[0])
 def calculate_angle(point1, point2, point3):
@@ -200,6 +202,7 @@ def alat(ind):
     if ind == 3 or ind == 5:
         return False
     return True
+# various techniques for trying to get an analytical solution for the spectres at vertex level, none really worked
 def failed_listconvert():
     metalist = get_metalist()
     coordlist = [[], [], [], [], [], []]

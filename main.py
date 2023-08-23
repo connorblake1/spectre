@@ -13,7 +13,7 @@ import os
 # HYPERPARAMETERS
 plotBorders = True
 supergrid = False # has to do with putting balls into each spectre, false no balls
-draw1 = True # uses original polygon method in sys translated draw metatiles submethod, other used by meta.py
+draw1 = True  # uses original polygon method in sys translated draw metatiles submethod, other used by meta.py
 auxcurve = .25
 linethickness = 1
 linedensity = 10
@@ -436,14 +436,20 @@ if A22Models:
 
 # Verify A and B have the same sites 8/16
 Alat = 0
+atype = 0
+acoord = 0
+btype = 0
+bcoord = 0
 for i in range(vertnum):
     type = get_vtype(i, adjmatrix, unique)
     print(type)
     if alat(type):
-        Alat += 1
+        atype += 1
+        acoord += get_coordination(type)
     else:
-        Alat -= 1
-print(Alat)
+        btype -= 1
+        bcoord += get_coordination(type)
+print(atype,btype,acoord,bcoord)
 
 
 # Plot Graph show the tiles in a consideration circle with or without labels
