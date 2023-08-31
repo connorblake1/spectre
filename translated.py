@@ -7,13 +7,20 @@ from scipy.linalg import null_space
 from scipy.linalg import eigh as scipy_eigh
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.distance import cdist
-from scipy.spatial import procrustes
+from scipy import signal
+from scipy.signal import argrelextrema, find_peaks, argrelmin
+from scipy.stats import uniform
+
+
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.patches import FancyArrowPatch
 import math
 import matplotlib
 import pickle
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
 from collections import namedtuple
 from matplotlib.artist import Artist
@@ -175,7 +182,7 @@ abgd = np.array([[0,1,0,1,-1,0,1,0,-1],#a # just the dict above but transposed i
 [0,-1,0,0,0,0,1,0,0],# z
 [0,0,1,0,1,0,0,1,1], # eta
 [0,0,1,-1,1,-1,0,0,0]])
-greek = {
+Greek = {
     'Gamma':"$\Gamma$",
     'Delta': "$\Delta$",
     'Theta': "$\Theta$",
@@ -184,7 +191,23 @@ greek = {
     'Pi': "$\Pi$",
     'Sigma': "$\Sigma$",
     'Phi': "$\Phi$",
-    'Psi': "$\Psi$"}
+    'Psi': "$\Psi$",
+    'a+': "$\\alpha$+",
+    'a-': "$\\alpha$-",
+    'b+': '$\\beta$+',
+    'b-': '$\\beta$-',
+    'g+': '$\gamma$+',
+    'g-': '$\gamma$-',
+    'd+': '$\delta$+',
+    'd-': '$\delta$-',
+    'ep+': '$\epsilon$+',
+    'ep-': '$\epsilon$-',
+    'z+': '$\zeta$+',
+    'z-': '$\zeta$-',
+    't+': '$\\theta$+',
+    't-': '$\\theta$-',
+    'eta': '$\eta$'
+}
 alpha_dict = {
     'Gamma': .1,
     'Delta': .2,
@@ -210,6 +233,39 @@ colmap = {
     'Phi': [1.0, 0.55, 0.0],
     'Psi': [.1, .1, 0.0]
 }
+# loads in 15 types - typed in manually from computeOverlap down below
+bind_dict = {
+    (1, 0, False, False): .009,
+    (2, 0, False, True): .012,
+    (3, 1, False, False): .017,
+    (5, 5, False, False): .024,
+    (0, 5, False, False): .05,
+    (1, 5, False, False): .02,
+    (2, 1, False, True): .051,
+    (1, 2, False, True): .097,
+    (0, 3, False, False): .063,
+    (5, 1, False, False): .033,
+    (1, 3, False, True): .02,
+    (2, 2, True, False): .025,
+    (1, 2, True, False): .016,
+    (4, 3, False, False): .072,
+    (1, 0, True, False): .009}
+sbind_dict = {
+    (1, 0, False, False): .003,
+    (2, 0, False, True): .004,
+    (3, 1, False, False): .006,
+    (5, 5, False, False): .008,
+    (0, 5, False, False): .018,
+    (1, 5, False, False): .007,
+    (2, 1, False, True): .019,
+    (1, 2, False, True): .036,
+    (0, 3, False, False): .023,
+    (5, 1, False, False): .012,
+    (1, 3, False, True): .007,
+    (2, 2, True, False): .009,
+    (1, 2, True, False): .005,
+    (4, 3, False, False): .027,
+    (1, 0, True, False): .003}
 def pt(x, y):
     return {'x': x, 'y': y}
 def inv(T):

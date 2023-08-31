@@ -15,11 +15,11 @@ plotBorders = True
 supergrid = False # has to do with putting balls into each spectre, false no balls
 draw1 = True  # uses original polygon method in sys translated draw metatiles submethod, other used by meta.py
 auxcurve = .25
-linethickness = 1
+linethickness = 3
 linedensity = 10
-recursions = 3
+recursions = 1
 balls = 30
-tile_sel = "Lambda"
+tile_sel = "Gamma"
 # Build spectres into vertices variable, implements old ball packing and picture generation that was fed into 2DTISE
 if True:
     plotCO = not plotBorders
@@ -163,9 +163,9 @@ if modConnect:
 A22Models = False
 if A22Models:
     # Analytic Generation - find all vertex and situation types
-    nn = 3 # 2 neighbors deep or 3 (really more like 1 and 2 but it's convention now)
+    nn = 2 # 2 neighbors deep or 3 (really more like 1 and 2 but it's convention now)
     label_list = [] # will enable labelling each vertex with requisite scheme
-    analyticGenerate = False # Generating the list of equations in some kind of array to be fed into metasolver, prints
+    analyticGenerate = True # Generating the list of equations in some kind of array to be fed into metasolver, prints
     # metalist pasteable makes label_list which enables tagging each named vertex
     if analyticGenerate:
         def eq_sort_key(item):
@@ -435,22 +435,23 @@ if A22Models:
                 print(row)
 
 # Verify A and B have the same sites 8/16
-Alat = 0
-atype = 0
-acoord = 0
-btype = 0
-bcoord = 0
-for i in range(vertnum):
-    type = get_vtype(i, adjmatrix, unique)
-    print(type)
-    if alat(type):
-        atype += 1
-        acoord += get_coordination(type)
-    else:
-        btype -= 1
-        bcoord += get_coordination(type)
-print(atype,btype,acoord,bcoord)
-
+siteVerify = False
+if siteVerify:
+    Alat = 0
+    atype = 0
+    acoord = 0
+    btype = 0
+    bcoord = 0
+    for i in range(vertnum):
+        type = get_vtype(i, adjmatrix, unique)
+        print(type)
+        if alat(type):
+            atype += 1
+            acoord += get_coordination(type)
+        else:
+            btype -= 1
+            bcoord += get_coordination(type)
+    print(atype, btype, acoord, bcoord)
 
 # Plot Graph show the tiles in a consideration circle with or without labels
 showGraph = True
@@ -471,6 +472,14 @@ if showGraph:
         3: (0, 0, 1.0),
         4: (0, 1, 1)
     }
+    true_bipartite_colors = {
+        -2: (1.0, 0, 0),
+        -3: (1.0, 0, 0),
+        2: (0, 0, 1),
+        3: (0, 0, 1.0),
+        4: (0, 0, 1)
+    }
+
     plt.cla()
     for j in range(vertnum):
         if np.all(adjmatrix[j] == 0):
@@ -482,8 +491,7 @@ if showGraph:
                 plt.gca().add_line(line)
         vnum = get_vtype(j, adjmatrix, unique)
         # circ = plt.Circle((unique[j][0], unique[j][1]), .5, facecolor=custom_color_dict[vnum]) #custom color mapping
-        circ = plt.Circle((unique[j][0], unique[j][1]), .5, facecolor=bipartite_color_dict[
-            (-1 + 2 * alat(vnum)) * coord(vnum)])  # bipartite color mapping
+        circ = plt.Circle((unique[j][0], unique[j][1]), .2, facecolor=true_bipartite_colors[(-1 + 2 * alat(vnum)) * coord(vnum)])  # bipartite color mapping
         plt.gca().add_patch(circ)
     # Labels all the vertices and their connections and equations
     if A22Models:
@@ -496,9 +504,8 @@ if showGraph:
                     eq_dict["".join(eq)] = counter
                     counter +=1
             for point,fname,oname in label_list:
-                plt.gca().annotate(oname.replace("_",""), (point[0], point[1]), textcoords="offset points", xytext=(0, 5), ha='center',color='white',fontsize=8)
-                plt.gca().annotate("Eq"+str(eq_dict[fname]), (point[0], point[1]), textcoords="offset points", xytext=(0, -3), ha='center',
-                                   color='white')
+                plt.gca().annotate(oname.replace("_",""), (point[0], point[1]), textcoords="offset points", xytext=(0, 5), ha='center',color='black',fontsize=8)
+                # plt.gca().annotate("Eq"+str(eq_dict[fname]), (point[0], point[1]), textcoords="offset points", xytext=(0, -3), ha='center',color='white')
     # if Metatiles:
     #     for i in range(vertnum):
     #         plt.gca().annotate(str(i), (unique[i][0],unique[i][1]), textcoords="offset points", xytext=(0, 5),
