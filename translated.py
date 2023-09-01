@@ -5,6 +5,7 @@ from scipy.sparse.linalg import eigsh as scipy_eigsh
 import time
 from scipy.linalg import null_space
 from scipy.linalg import eigh as scipy_eigh
+from scipy.linalg import eigh as scipy_eig
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.distance import cdist
 from scipy import signal
