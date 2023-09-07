@@ -1,8 +1,8 @@
 from PIL import Image
 import numpy as np
 # MICKEY MOUSE PHASE INVERSION - JUST INVERT THE RED AND BLUE PIXELS
-folder = "Patch8_ConnectTrue"
-filename = "15_Lin_e_-2.089"
+folder = "Patch2_ConnectTrue"
+filename = "linLin_19_e_-2.386_"
 image_path = folder + "\\" + filename + ".png"
 image = Image.open(image_path)
 image_array = np.array(image)

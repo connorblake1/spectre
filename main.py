@@ -17,9 +17,13 @@ draw1 = True  # uses original polygon method in sys translated draw metatiles su
 auxcurve = .25
 linethickness = 3
 linedensity = 10
-recursions = 1
+recursions = 0
 balls = 30
-tile_sel = "Gamma"
+tile_sel = "Psi"
+fname = "BasicImages"
+
+if not os.path.exists(fname):
+    os.makedirs(fname)
 # Build spectres into vertices variable, implements old ball packing and picture generation that was fed into 2DTISE
 if True:
     plotCO = not plotBorders
@@ -486,12 +490,13 @@ if showGraph:
             continue
         for i in range(vertnum):
             if adjmatrix[j][i] != 0:
-                line = plt.Line2D((unique[i][0], unique[j][0]), (unique[i][1], unique[j][1]), linewidth=1,
+                line = plt.Line2D((unique[i][0], unique[j][0]), (unique[i][1], unique[j][1]), linewidth=2,
                                   color='black')
                 plt.gca().add_line(line)
         vnum = get_vtype(j, adjmatrix, unique)
         # circ = plt.Circle((unique[j][0], unique[j][1]), .5, facecolor=custom_color_dict[vnum]) #custom color mapping
-        circ = plt.Circle((unique[j][0], unique[j][1]), .2, facecolor=true_bipartite_colors[(-1 + 2 * alat(vnum)) * coord(vnum)])  # bipartite color mapping
+        # circ = plt.Circle((unique[j][0], unique[j][1]), .2, facecolor=true_bipartite_colors[(-1 + 2 * alat(vnum)) * coord(vnum)])  # bipartite color mapping
+        circ = plt.Circle((unique[j][0], unique[j][1]), .2, facecolor='black')  # bipartite color mapping
         plt.gca().add_patch(circ)
     # Labels all the vertices and their connections and equations
     if A22Models:
@@ -513,7 +518,15 @@ if showGraph:
     if showCircle:
         plt.gca().add_patch(plt.Circle(center, rad))
     plt.axis('tight')
+    plt.xticks([])
+    plt.yticks([])
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['bottom'].set_visible(False)
+    plt.gca().spines['left'].set_visible(False)
     plt.gca().set_aspect('equal')
+    plt.savefig(str(fname)+"\\Basic"+str(recursions)+ ".png", dpi=400)
     plt.show()
 
 # Compute Energies for adjacency matrix subject to some parameters (ie bands, individual plots etc)

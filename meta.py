@@ -1,4 +1,7 @@
 import os
+
+import numpy as np
+
 from translated import *
 from metasolve import *
 
@@ -264,6 +267,7 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
         else:
             ncut = "lin"
             rHigh = max(state)
+            absMax = rHigh
             cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['white', 'red'])
             cnorm = mcolors.Normalize(vmin=0, vmax=rHigh)  # Adjust vmin and vmax as needed
             ax_colorbar = plt.subplot(gs[1])
@@ -286,7 +290,7 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
             continue  # dead vertices states that override white
         # mapval = np.square(np.abs(e_vec[j, i]))
         mapval = state[j]
-        circ = plt.Circle((uni[j][0], uni[j][1]), .3, facecolor=cmap(cnorm(mapval)),zorder=10,edgecolor='black', linewidth=1)
+        circ = plt.Circle((uni[j][0], uni[j][1]), .35+.25*abs(mapval)/absMax, facecolor=cmap(cnorm(mapval)),zorder=10,edgecolor='black', linewidth=.5)
         ax_main.add_patch(circ)
 
     plt.tight_layout()
@@ -327,19 +331,26 @@ def drawSpectra(gam,posi,fname,makeHistogram):
         plt.cla()
 
 def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBands=False, bandsIn=[1, 4, 8, 16, 24, 32],
-               lowE=0, highE=40, S_mat=None,gammas=list(np.linspace(0.01,1.5,20))):
+               lowE=0, highE=40, S_mat=None,gammas=list(np.linspace(0.001,1,20))):
     # strip dead states
     row_sums = np.sum(adj, axis=1)
     col_sums = np.sum(adj, axis=0)
     valid_rows = np.where(row_sums != 0)[0]
     valid_cols = np.where(col_sums != 0)[0]
-    adj = adj[valid_rows][:, valid_cols]
-    uni = uni[valid_rows]
+    valid_rows = [int(i) for i, x in enumerate(row_sums) if True and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)] # TODO
+    valid_cols= [int(i) for i, x in enumerate(row_sums) if True and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+    print("Row Validity:",np.allclose(valid_rows,valid_cols))
+    adjNew = adj[valid_rows][:, valid_cols]
+    if S_mat is not None:
+        S_matNew = S_mat[valid_rows][:,valid_cols]
+    else:
+        S_matNew = None
+    uniNew = uni[valid_rows]
     # diagonalize
     if S_mat is None:
-        e_values, e_vec = np.linalg.eigh(adj)
+        e_values, e_vec = np.linalg.eigh(adjNew)
     else:
-        e_values, e_vec = scipy_eigh(adj, S_mat)
+        e_values, e_vec = scipy_eigh(adjNew, S_matNew)
     # expects adj to have negative hops, diagonal energy
     plt.cla()
     # States
@@ -348,31 +359,23 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
     makeBand = drawBands
     showgraphs = False
     bands = bandsIn
-    vertnum = len(uni)
+    vertnum = len(uniNew)
     if not os.path.exists(filename):
         os.makedirs(filename)
     # modify spectrum for zeromode correctoin with rank deficiency
-    positions = [x for x in e_values if abs(x) > .0001]
-    gap = len(e_values) - len(positions)  # number of modes thrown out
-    deadrows = 0
-    for row in adj:
-        if np.sum(row) == 0:
-            deadrows += 1
-    extension = gap - deadrows
-    positions.extend([0] * extension)
-    print("Extending",filename,extension)
+    print("Zeromodes",filename,len([x for x in e_values if abs(x) < .0001]))
+    positions = e_values
     if makeSpectrum:
         for gamma in gammas:
             drawSpectra(gamma,positions,filename,True)
     if makeIndivGraphs:
-        graphedZeromodes = 0
         for i in range(lowE, min(highE, len(e_values))):
             plotname = "Eigenstate: " + str(i+1)+", Energy: " + "{:.3f}".format(e_values[i]) + "$\mathit{t}$"
             fout = 'Lin_' + str(i+1) + '_e_' + "{:.3f}".format(e_values[i])
-            drawIndivState(filename,plotname,fout,adj,uni,e_vec[:,i],wfc=True,doLog=False)
+            drawIndivState(filename,plotname,fout,adjNew,uniNew,e_vec[:,i],wfc=True,doLog=False)
 
             fout = "Log_" + str(i+1) + '_e_' + "{:.3f}".format(e_values[i])
-            drawIndivState(filename,plotname,fout,adj,uni,e_vec[:,i],wfc=True,doLog=True)
+            drawIndivState(filename,plotname,fout,adjNew,uniNew,e_vec[:,i],wfc=True,doLog=True)
     if makeBand:
         for bandopt in bands:
             mapval = []
@@ -383,11 +386,9 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
                 mapval.append(hold/bandopt)
             plotname = "Normalized Density (" + str(bandopt) + " elec. / " + str(vertnum) + " orbitals)"
             fout = "Log_Bands_" + '_' +str(lowE) + "." + str(bandopt)
-            drawIndivState(filename,plotname,fout,adj,uni,mapval,wfc=False,doLog=True)
+            drawIndivState(filename,plotname,fout,adjNew,uniNew,mapval,wfc=False,doLog=True)
             fout = "Lin_Bands_" + '_' + str(lowE) + "." + str(bandopt)
-            drawIndivState(filename, plotname, fout, adj, uni, mapval, wfc=False, doLog=False)
-
-
+            drawIndivState(filename, plotname, fout, adjNew, uniNew, mapval, wfc=False, doLog=False)
 """
 Written 8/11->8/15
 This block of code finds the conditions (ie number of each metatile type) under which all the edges will be able to wrap.
@@ -437,10 +438,9 @@ Key Concepts:
     "super scheme"      using 1 orbital on each site, does TB on just the metatiles with the saved 15 types of angle-Gamma hops into HexHopStates#
 """
 superTileType = "Psi"  # UNLESS YOU PICK GAMMA, SHOULD WORK. Psi is what all the ind_lists are based on, so keep
-recursions = 3  # This is how big it goes. 1,2 don't work for an unknown bug reason. 3 is large (5 seconds), 4 is massive (~1 minute), 5 takes unknown amount of time. Note that everything is mirrored between levels.
+recursions =3  # This is how big it goes. 1,2 don't work for an unknown bug reason. 3 is large (5 seconds), 4 is massive (~1 minute), 5 takes unknown amount of time. Note that everything is mirrored between levels.
 doWrap = False  # DEFAULT: FALSE If the patch is balanced (mistaken belief, see description of solveBalancedPatch above)
 tileConnect = True  # DEFAULT: TRUE Whether to connect the tiles together along vertices. This is assumed true for much of the program, so be extremely careful if false
-
 
 showHexagons = True  # Whether to show the metatiles
 showIndex = True
@@ -449,34 +449,61 @@ yesRotate = True  # iif showHexagons, whether to rotate tile labels
 showPatchOnly = True # iif showHexagons, only displays the hexagons specified in ind_list, else all in centers
 saveHex = True  # iif showHexagons, saves to Png in superfilename folder
 saveHexType = 0  # 0 = normal, 1 = diamonds, 2 = BW arrows
-colorScheme = 1  # 0 = random, 1 = grayscale (only works with recursion3)
+colorScheme = 1  # 0 = random, 1 = grayscale (only works with recursion3 diamonds)
 
 showVertices = True  # displays stitched/rotated vertices on the metatiles from ind_list
 saveVerts = True  # iif showVertices and not saveHex, saves to pdf
 hexOnly = False  # use only for iList >= 10, skips all vertex operations and only deals with metatiles in order to compute the largest patches in the GammaGammaScheme
 
 
-doProjections = True  # whether to compute the projection matrices and all subsequent operations (metascheme (assining N_vals orbitals to each metatile trying to see how many needed), goodness of fit calculations
+doProjections = False # whether to compute the projection matrices and all subsequent operations (metascheme (assining N_vals orbitals to each metatile trying to see how many needed), goodness of fit calculations
 drawProjectors = False # iif doProjections, both draws creates MetaProject_Patch# (showing all N_vals coeffs on all tiles), and creates folders showing individual projectors / eigenstates of P_AH_totP_A|Psi_A>=E|Psi_A>
-verifyProjectors = False  # prints things like whether add to identity etc, prints out metastates
-computeOverlap = True  # iif doProjections, does a ton of verification operations (printing, some graphing), see this section for more info
+verifyProjectors = False  # prints things like whether add to identity etc, prints out metastates Hamiltonian
+computeOverlap = True # iif doProjections, does a ton of verification operations (printing, some graphing), see this section for more info
 localChern = False  # needs magnetization
-N_vals = 5  # number of "orbitals" per tile in the metascheme
-
+N_vals = 2  # number of "orbitals" per tile in the metascheme
 
 doA2222Scheme = False  # EXITS PROGRAM ON COMPLETION tries to self-consistently solve for t_a, A, e_A, E by looking at all possible configurations of 7 and solving 37 equations
-doGammaGammaScheme = False  # key to super scheme, finds 15 edge types and then assigns hopping values and runs TB on the hexagons with these values
+doGammaGammaScheme = True  # key to super scheme, finds 15 edge types and then assigns hopping values and runs TB on the hexagons with these values
 hexTB = False  # key to superscheme, runs hex TB with 15 types
 doCrystallography = False
+doGraphene = False
+doSingleSpectre = False
 
-doVertexStates = False  # calculates states of all the vertices in H_tot (totalAdj)
-doSpectrum = True
+doVertexStates = True # calculates states of all the vertices in H_tot (totalAdj)
+doSpectrum = False
 doIndivs = True
-doBands = True
-stateNum = 1000  # number of individual states to draw in vertex scheme
-bandList = [1, 4, 8, 16, 24, 32]
-gammasIn = list(np.geomspace(.01,.5,20))
+doBands = False
+stateNumLow = 550
+stateNumHigh = 570  # number of individual states to draw in vertex scheme
+bandList = [4, 8, 16, 24, 32, 64, 128, 256]
+gammasIn = list(np.geomspace(.001, .5, 20))
 # build centers = (position, name, orientation), adj
+if doSingleSpectre:
+    print("Computing Single, then exiting.")
+    n = 14
+    adj_matrix = np.zeros((n, n), dtype=int)
+    for i in range(n):
+        adj_matrix[i, (i + 1) % n] = 1
+        adj_matrix[i, (i - 1) % n] = 1
+    verts = []
+    verts.append([0, 0]),
+    verts.append([1.0, 0.0])
+    verts.append([1.5, -0.8660254037844386])
+    verts.append([2.366025403784439, -0.36602540378443865])
+    verts.append([2.366025403784439, 0.6339745962155614])
+    verts.append([3.366025403784439, 0.6339745962155614])
+    verts.append([3.866025403784439, 1.5])
+    verts.append([3.0, 2.0])
+    verts.append([2.133974596215561, 1.5])
+    verts.append([1.6339745962155614, 2.3660254037844393])
+    verts.append([0.6339745962155614, 2.3660254037844393])
+    verts.append([-0.3660254037844386, 2.3660254037844393])
+    verts.append([-0.866025403784439, 1.5])
+    verts.append([0.0, 1.0])
+    verts = np.array(verts)
+    drawStates(-adj_matrix,verts,"SingleSpectre",True,True,False,gammas=gammasIn)
+    exit()
 if True:
     matplotlib.rcParams.update(matplotlib.rcParamsDefault)
     fig, ax = plt.subplots()
@@ -728,31 +755,36 @@ if doGammaGammaScheme:
     # for key in gdict:
     #     print(key,gdict[key])
 
+
+
 # Build ind_list
-iList = 2 # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
+iList =2   # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
 if True:
     if iList == -1:
-        ind_list = [0]
+        ind_list = [478]
     elif iList == -2:
         ind_list = [7]
+    elif iList == -3:
+        ind_list = [472,491] # generating 15 types
+    elif iList == -4:
+        ind_list = list(range(110))
     elif iList == 0:
-        ind_list = [450, 456, 471, 449, 451, 470, 469, 463, 113]  # WORKING LIST FOR DELTA TILE
+        ind_list = [450, 456, 471, 449, 451, 470, 469, 463, 113]
     elif iList == 1:
-        ind_list = [102, 118, 112, 120, 121, 101, 471, 71, 95, 449, 470, 119, 115, 469, 117, 457, 113,
-                    111]  # WORKING LIST FOR DELTA TILE
+        ind_list = [102, 118, 112, 120, 121, 101, 471, 71, 95, 449, 470, 119, 115, 469, 117, 457, 113, 111]
     elif iList == 2:  # all the possible 15 edge connection types
         ind_list = [309, 310, 291, 284, 308, 314, 311, 267, 290, 288, 285, 306, 307, 300, 462, 451, 313, 312, 266]
-    elif iList == 3:  # line zig zag
-        ind_list = [466, 469, 113, 457, 111, 459, 125, 124, 69, 70, 64, 237, 244, 221]
+    elif iList == 3:  # 3x6 grouping
+        ind_list = [472,466,467,469,468,470,113,114,457,112,458,111,118,459,119,302,125,120]
     elif iList == 4:  # 7 patch center of 5, 9
         # ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452] only outsides of 7 patch
         ind_list = [451, 462, 461, 464, 449, 450, 463]
     elif iList == 5:  # hexagon patch (4 is just the inside)
         ind_list = [313, 314, 308, 300, 460, 458, 457, 470, 471, 456, 453, 452, 451, 462, 461, 464, 449, 450, 463]
-    elif iList == 6:  # dead slot
-        ind_list = [464,449,463,461,458,457,470]
+    elif iList == 6:  # zizzag
+        ind_list = [300,301,460,302,459,125,119,120,95,102]
     elif iList == 7:  # etas + surroundings (7patch)
-        ind_list = [457, 111, 112, 113, 114, 115, 118]
+        ind_list = [463,461,460,302,124,123,76,239,240,84]
     elif iList == 8:
         ind_list = [457, 111]
     elif iList == 9:
@@ -775,14 +807,6 @@ if True:
         print(ind_list)
     indSize = len(ind_list)
     superfilename = "Patch" + str(iList) + "_Connect" + str(tileConnect)
-
-    if iList <= 1:
-        print("Verifying edge balances...")
-        print(computeEdgeBalancePatch(ind_list))
-        if not checkBal(computeEdgeBalancePatch(ind_list)):
-            print("FATAL ERROR: UNBALANCED")
-        else:
-            print("Verified edge balances.")
 
 # build matches, totalAdj, totalVertices
 if True:
@@ -835,6 +859,7 @@ if True:
             size_list.append(s1)
             blockoffsets.append(holdOffset)
             holdOffset += s1
+        print("Tiles:",indSize)
         print("Block diagonal sizes:", size_list)
         print("Offsets:",blockoffsets)
         # build vertex list in the correct locations (includes duplicates), labelled in same index order as totalAdj
@@ -845,7 +870,13 @@ if True:
             totalVertices.append([])
         locked = [False] * indSize
         locked[0] = True
+        print("Matching...")
+        matchCycles = 0
         while not all(locked):
+            matchCycles += 1
+            if matchCycles > indSize:
+                print("Disconnected List of Tiles. Exiting.")
+                exit()
             for match in matches:
                 # i1 = index in ind_list, o1 = absolute edge orientation, e1 = edge name, p1 = pointlist of edgename, t1 is tilename
                 m1, m2 = match
@@ -1044,10 +1075,11 @@ if not hexOnly and showVertices:
                 continue
             else:
                 col = (0, 0, 1)
+        col = (0,0,0) # TODO
         x.append(totalVertices[i, 0])
         y.append(totalVertices[i, 1])
         cols.append(col)
-    plt.scatter(x, y, c=cols)
+    plt.scatter(x, y, c=cols,s=12)
     print("Active Vertices:", actives)
     # for i in range(len(x)):
     #     plt.text(x[i], y[i], str(i), fontsize=12, ha='center', va='center')
@@ -1067,8 +1099,27 @@ if saveVerts and showVertices:
     plt.gca().spines['left'].set_visible(False)
     plt.savefig(str(superfilename) + "\\" + vertfilename + ".png",dpi=400)
 
+if doGraphene:
+    Hgraph = np.zeros((2*indSize,2*indSize))
+    Vgraph = np.zeros((2*indSize,2))
+    onsite = 0
+    hop = 1
+    for i,ind in enumerate(ind_list):
+        centI, labI, oriI = centers[ind]
+        Vgraph[2*i,0] = centI[0]
+        Vgraph[2*i,1] = centI[1]
+        Vgraph[2*i+1, 0] = centI[0]+1
+        Vgraph[2*i+1, 1] = centI[1]
+    for i,vertI in enumerate(Vgraph):
+        for j,vertJ in enumerate(Vgraph):
+            if unitdist(vertJ,vertI,1,.1):
+                Hgraph[i,j] = 1
+    print("Sym?",np.allclose(Hgraph,Hgraph.T))
+    drawStates(-Hgraph,Vgraph,"Graphene"+str(iList),True,True,False)
+    exit()
 # on a large hex grid, assign arbitrary hoppings between tiles dependent on edge only (not orientation, gamma or not)
 if hexTB and not doGammaGammaScheme:
+    print("UNVERIFIED CODE BAD RESULTS GOING TO HEXSTATES FOLDERS")
     Hhex = np.zeros((indSize, indSize))
     scheme = 2
     onsite = 0  # -8.2176
@@ -1117,10 +1168,11 @@ if hexTB and not doGammaGammaScheme:
     print("Number of metatiles:", indSize)
     fname = "HexStates" + str(iList) + "_" + str(onsite) + "_" + str(bz) + "_" + str(a_ep) + "_" + str(gdte)
     drawStates(Hhex, verts, fname, True, True, True, highE=(indSize - 1), bandsIn=[1, 30, 50, 100, 150])
+    exit()
 # super scheme - uses 15 computed values from meta hopping matrix of ground states and does it for large patches
 if hexTB and doGammaGammaScheme:
     randomDict = True
-    # if randomDict: TODO
+    # if randomDict: implement random hoppings
 
     # invert dicts as necessary
     if recursions % 2 == 0:
@@ -1167,9 +1219,9 @@ if hexTB and doGammaGammaScheme:
     vertsG = []
     for i, ind in enumerate(ind_list):
         vertsG.append(centers[ind][0])
+    vertsG = np.array(vertsG)
     drawStates(HhexG, vertsG, "HexHopStates" + str(iList), lowE=0, highE=indSize, bandsIn=[1, 50, 100], drawIndivs=True,
                drawSpectrum=True, S_mat=SmatG)
-
 # SHOW PROJECTED STATES
 # build projection matrices and find states (solve P_AHP_A|Psi_A> = E|Psi_A>)
 if doProjections and not hexOnly:
@@ -1281,9 +1333,12 @@ if doProjections and not hexOnly:
                 print("<psi_i|H|psi_j> Matrix for all i,j, each states up to", N_vals)
                 truncated_matrix = np.round(t_matrix, 3)
                 for i, line in enumerate(truncated_matrix):
-                    outs = str(ind_list[i // N_vals]) + "\t"
+                    outs = str(ind_list[i // N_vals]) + "&\t"
                     for val in line:
-                        outs += str(val) + "\t"
+                        if abs(val) < .001:
+                            val = 0
+                        outs += str(val) + "&"
+                    outs += "\\\\"
                     print(outs)
                 print("<psi_i|psi_j> Matrix for all i,j, each states up to", N_vals)
                 truncated_matrix = np.round(overlapMatrix, 3)
@@ -1476,55 +1531,70 @@ if doProjections and not hexOnly:
             if doTileNorm:
                 totalStatesCounted = indSize
                 storage = np.zeros((totalStatesCounted,78,indSize))
+                tnorm = np.zeros((totalStatesCounted,indSize))
                 for totState in range(totalStatesCounted):
                     for i, ind in enumerate(ind_list):
                         sum = 0
                         for j in range(int(np.trace((projectors[ind])))):
                             sum += np.square(np.abs(np.dot(np.conj(totalStates[:, totState]), projectStates[ind][:, j])))
+                        tnorm[totState,i] = sum
                         for tileState in range(int(np.trace(projectors[ind]))):
                             state1 = np.square(np.abs(np.dot(np.conj(totalStates[:, totState]), projectStates[ind][:, tileState])))
                             # print(str(ind) + " tilenorm = sum_i->" + str(size_list[i]) + " |<Psi_tot_"+str(totState)+"|Psi_" + str(
                             #     ind) + "_i>|^2 = " + str(
                             #     np.round(sum, 3)) + "\tcompleteness of "+str(tileState)+"^th tile state = |<Psi_tot_"+str(totState)+"|Psi_" + str(
                             #     ind) + "_"+str(tileState)+">|^2/tilenorm = " + str(np.round(state1 / sum, 3)))
-                            storage[totState,tileState,i] = np.round(state1/sum,3)
-                print("Completeness of total ground by each tile's ground:",storage[0,0,:]) # ie completeness of ground totalState by ground tileStates - decent
+                            storage[totState,tileState,i] = state1
+                print("Completeness of total ground by each tile's ground:",storage[0,0,:]/tnorm[0,:]) # ie completeness of ground totalState by ground tileStates - decent
+                stateCDF = np.zeros((totalStatesCounted,78,indSize))
                 for totState in range(totalStatesCounted):
                     for tile in range(indSize):
                         sum = 0
                         for tileState in range(78):
-                            sum += storage[totState,tileState,tile]
+                            sum += storage[totState,tileState,tile]/tnorm[totState,tile]
+                            stateCDF[totState,tileState,tile] += sum
                         print(totState,tile,sum) # verifies add to 1
                 # generate plots
                 plt.close('all')
+                toPlot = 36
                 fig = plt.figure(figsize=(10,6))
                 gs = gridspec.GridSpec(1, 2, width_ratios=[0.95, 0.05])  # Graph space, Legend space
                 ax = plt.subplot(gs[0])
                 for i in range(indSize):
-                    ax.plot(storage[0,:36,i], label=centers[ind_list[i]][1] + str(ind_list[i]))
+                    # ax.plot(storage[0,:36,i]/tnorm[0,i], label=centers[ind_list[i]][1] + str(ind_list[i]))
+                    ax.plot(np.arange(1,toPlot+1),stateCDF[0,:toPlot,i],label=centers[ind_list[i]][1] + str(ind_list[i]))
                 ax.set_xlabel('Tile State ($m$)')
-                ax.set_ylabel('Completeness $C_{0,m}$')
-                ax.set_title('How well the $m^{th}$ state of each tile represents $\Psi^0_{tot}$')#_{\\text{tot}}
+                plt.xticks(np.arange(1,toPlot+1,5))
+
+                # ax.set_ylabel('State Completeness $C_{A,0,m}$')
+                ax.set_ylabel('Cumulative Completeness $\sum_i^mC_{A,1,i}$')
+                plt.ylim(0,1)
+                ax.set_title('How well the $m^{th}$ state of each tile represents $\Psi^1_{tot}$')#_{\\text{tot}}
                 ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-                # plt.savefig(superfilename+"\\C0m.png",dpi=400)
+                plt.savefig(superfilename+"\\C0mCDF.png",dpi=400)
                 # plt.show()
 
-                tileIndex = ind_list.index(309)
+                if iList == 2:
+                    tileIndex = ind_list.index(309)
+                else:
+                    tileIndex = 0
                 plt.close('all')
                 fig = plt.figure(figsize=(10, 6))
                 plt.cla()
                 gs = gridspec.GridSpec(1, 2, width_ratios=[0.90,.1])  # Graph space, Legend space
                 ax = plt.subplot()
                 tilenamestr = centers[ind_list[tileIndex]][1] + str(ind_list[tileIndex])
-                ax.plot(np.arange(1,totalStatesCounted+1),storage[:, 0, tileIndex], label=tilenamestr)
+                ax.plot(np.arange(1,totalStatesCounted+1),storage[:, 0, tileIndex],label=r"$|<\Psi_{tot}^n|\Psi_{"+tilenamestr+"}^1>|^2$")#"$C_{"+tilenamestr+",n,0}$")
+                ax.plot(np.arange(1,totalStatesCounted+1),tnorm[:,tileIndex],label="$T_{"+tilenamestr+",n}$")
                 ax.set_xlabel('Total State ($n$)')
-                ax.set_ylabel('Completeness $C_{'+tilenamestr+',n,0}$')
+                ax.set_ylabel("Square of Overlap")
                 plt.xticks(np.arange(1,totalStatesCounted))
+                plt.ylim(0,1)
                 ax.set_title("How Well $\Psi^n_{tot}$ is Captured by Tile "+tilenamestr+"'s Ground State") #_{\\text{tot}}
                 ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-                plt.subplots_adjust(right=.82)
+                plt.subplots_adjust(right=.78)
                 plt.savefig(superfilename+"\\Cn0.png",dpi=400)
-                plt.show()
+                # plt.show()
 
 
             # TODO NOT REAL LINEAR ALGEBRA, SECTIONS BELOW NOT VERIFIED
@@ -1576,13 +1646,13 @@ if doProjections and not hexOnly:
                         j1, i1 = matchPos(centerxyI, centerxyJ)
                         oriI1 = mirrorIndex((i1 - oriI + 6) % 6, recursions)
                         edgeI = edge_dict[labelI][oriI1]
-                        val = np.round(np.dot(np.conjugate(psi_i), np.dot(totalAdj, psi_j)), 3)
+                        val = np.round(np.dot(np.conjugate(psi_i), np.dot(sAdj, psi_j)), 3)
                         sval = np.round(np.dot(np.conj(psi_i), psi_j), 3)
                         val = abs(val)
                         if ul in gdict:
-                            gdict[ul].append((edgeI, val, sval))
+                            gdict[ul].append((edgeI, val, sval,ind,one))
                         else:
-                            gdict[conjLabel(ul)].append((edgeI, val, sval))
+                            gdict[conjLabel(ul)].append((edgeI, val, sval,ind,one))
                 for key in gdict:
                     print(key, gdict[key])
 
@@ -1645,5 +1715,6 @@ if doProjections and not hexOnly:
 
 # solve the states for all vertices using H_tot (totalAdJ)
 if doVertexStates and not hexOnly:
-    drawStates(-totalAdj, totalVertices, superfilename, doSpectrum, doIndivs, doBands, bandList, 0,
-               stateNum,gammas=gammasIn)
+    print("Generating Vertex States...")
+    drawStates(-totalAdj, totalVertices, superfilename, doSpectrum, doIndivs, doBands, bandList, stateNumLow,
+               stateNumHigh,gammas=gammasIn)
