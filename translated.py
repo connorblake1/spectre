@@ -1,9 +1,10 @@
 import numpy as np
 from sympy import symbols, Eq, nsolve, solve, Matrix, lambdify
 from scipy.sparse import csc_matrix
-from scipy.sparse.linalg import eigsh as scipy_eigsh
 import time
 from scipy.linalg import null_space
+from scipy.sparse.linalg import eigsh as scipy_eigsh
+from scipy.sparse import csr_matrix
 from scipy.linalg import eigh as scipy_eigh
 from scipy.linalg import eigh as scipy_eig
 from scipy.spatial.transform import Rotation as R
@@ -11,6 +12,8 @@ from scipy.spatial.distance import cdist
 from scipy import signal
 from scipy.signal import argrelextrema, find_peaks, argrelmin
 from scipy.stats import uniform
+from scipy.ndimage import gaussian_filter
+
 
 
 import matplotlib.cm as cm
@@ -28,6 +31,7 @@ from matplotlib.artist import Artist
 import matplotlib.transforms as mtransforms
 import matplotlib.patches as patches
 import random
+defectList = [300]
 ident = [1,0,0,0,1,0]
 s32 = np.sqrt(3) / 2
 rad = 1
@@ -68,6 +72,7 @@ gamma_dict = {
     4: [47,48,49,50,51,52,55,56],    # Blank list
     5: [63,70,69,60,59,58,57,56]     # Blank list
 }
+gammaEdge = [5,4,3,65,64,63,70,69,60,59,58,57,56,47,48,49,50,51,52,55,46,45,38,37,32,31,30,29,28,27,26,25,24,20,19,18,17,16,11,10,6,7,8,9]
 delta_dict = {
     0: [6,5,4,3,72,71,70],    # Blank list
     1: [26,25,24,17,16,11,10,9,8,7,6],    # Blank list
@@ -76,6 +81,7 @@ delta_dict = {
     4: [53,54,55,56,57,58],    # Blank list
     5: [58,59,62,63,64,65,66,67,76,77,70]     # Blank list
 }
+elseEdge = [6,5,4,3,72,71,70,58,59,62,63,64,65,66,67,76,77,53,54,55,56,57,52,45,44,39,38,37,36,35,26,27,28,29,30,31,34,25,24,17,16,11,10,9,8,7,6,5,4,3,72,71]
 theta_dict = {
     0: [5,4,3,72,71,70],    # Blank list
     1: [5,6,7,8,9,10,11,16,17,24,25],    # Blank list

@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import scipy.fft
 
 from translated import *
 from metasolve import *
@@ -331,14 +332,20 @@ def drawSpectra(gam,posi,fname,makeHistogram):
         plt.cla()
 
 def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBands=False, bandsIn=[1, 4, 8, 16, 24, 32],
-               lowE=0, highE=40, S_mat=None,gammas=list(np.linspace(0.001,1,20))):
+               lowE=0, highE=40, S_mat=None,gammas=list(np.linspace(0.001,1,20)),defects=False):
     # strip dead states
     row_sums = np.sum(adj, axis=1)
     col_sums = np.sum(adj, axis=0)
-    valid_rows = np.where(row_sums != 0)[0]
-    valid_cols = np.where(col_sums != 0)[0]
-    valid_rows = [int(i) for i, x in enumerate(row_sums) if True and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)] # TODO
-    valid_cols= [int(i) for i, x in enumerate(row_sums) if True and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+    if defects:
+        print("Defecting",defectList)
+        valid_rows = [int(i) for i, x in enumerate(row_sums) if
+                      i not in defectList and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+        valid_cols = [int(i) for i, x in enumerate(row_sums) if
+                      i not in defectList and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+    else:
+        valid_rows = np.where(row_sums != 0)[0]
+        valid_cols = np.where(col_sums != 0)[0] # TODO
+    print("Plotted Vertices",len(valid_rows))
     print("Row Validity:",np.allclose(valid_rows,valid_cols))
     adjNew = adj[valid_rows][:, valid_cols]
     if S_mat is not None:
@@ -347,11 +354,18 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
         S_matNew = None
     uniNew = uni[valid_rows]
     # diagonalize
+    start_time = time.time()
     if S_mat is None:
+
         e_values, e_vec = np.linalg.eigh(adjNew)
+        # sparse_adjNew = csc_matrix(adjNew)
+        # e_values, e_vec = scipy_eigsh(sparse_adjNew)
     else:
         e_values, e_vec = scipy_eigh(adjNew, S_matNew)
     # expects adj to have negative hops, diagonal energy
+    end_time = time.time()
+    tictoc = end_time - start_time
+    print("Diagonalizing Time:",tictoc)
     plt.cla()
     # States
     makeIndivGraphs = drawIndivs
@@ -453,10 +467,11 @@ colorScheme = 1  # 0 = random, 1 = grayscale (only works with recursion3 diamond
 
 showVertices = True  # displays stitched/rotated vertices on the metatiles from ind_list
 saveVerts = True  # iif showVertices and not saveHex, saves to pdf
+vertColor = 2  # 0 is colorful, 1 is all black, 2 is highlighted edges
 hexOnly = False  # use only for iList >= 10, skips all vertex operations and only deals with metatiles in order to compute the largest patches in the GammaGammaScheme
 
 
-doProjections = False # whether to compute the projection matrices and all subsequent operations (metascheme (assining N_vals orbitals to each metatile trying to see how many needed), goodness of fit calculations
+doProjections = True # whether to compute the projection matrices and all subsequent operations (metascheme (assining N_vals orbitals to each metatile trying to see how many needed), goodness of fit calculations
 drawProjectors = False # iif doProjections, both draws creates MetaProject_Patch# (showing all N_vals coeffs on all tiles), and creates folders showing individual projectors / eigenstates of P_AH_totP_A|Psi_A>=E|Psi_A>
 verifyProjectors = False  # prints things like whether add to identity etc, prints out metastates Hamiltonian
 computeOverlap = True # iif doProjections, does a ton of verification operations (printing, some graphing), see this section for more info
@@ -469,13 +484,14 @@ hexTB = False  # key to superscheme, runs hex TB with 15 types
 doCrystallography = False
 doGraphene = False
 doSingleSpectre = False
+doDefects = False
 
-doVertexStates = True # calculates states of all the vertices in H_tot (totalAdj)
+doVertexStates = False  # calculates states of all the vertices in H_tot (totalAdj)
 doSpectrum = False
 doIndivs = True
 doBands = False
-stateNumLow = 550
-stateNumHigh = 570  # number of individual states to draw in vertex scheme
+stateNumLow = 165
+stateNumHigh = 188 # number of individual states to draw in vertex scheme
 bandList = [4, 8, 16, 24, 32, 64, 128, 256]
 gammasIn = list(np.geomspace(.001, .5, 20))
 # build centers = (position, name, orientation), adj
@@ -758,7 +774,7 @@ if doGammaGammaScheme:
 
 
 # Build ind_list
-iList =2   # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
+iList = -2  # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
 if True:
     if iList == -1:
         ind_list = [478]
@@ -798,6 +814,10 @@ if True:
         h = 40
         k = 27.5
         r = 22
+    elif iList == 12:
+        h = 1.9
+        k = 17.4
+        r = 14
     if iList >= 10:
         ind_list = []
         for i in range(len(centers)):
@@ -982,22 +1002,37 @@ if True:
 
         if doCrystallography:
             print("Starting FT")
-            x_coords, y_coords = zip(*totalVertices)
-            res = 512
-            x_range = np.linspace(min(x_coords), max(x_coords), num=res)
-            y_range = np.linspace(min(y_coords), max(y_coords), num=res)
-            X, Y = np.meshgrid(x_range, y_range)
-            fourier_transform = np.zeros_like(X, dtype=complex)
-            for i,(x, y) in enumerate(totalVertices):
-                if np.sum(totalAdj[i]) != 0:
-                    fourier_transform += np.exp(-2j * np.pi * (X * x + Y * y))
-            plt.imshow(np.abs(fourier_transform), extent=(min(x_range), max(x_range), min(y_range), max(y_range)))
-            plt.colorbar()
-            plt.title('Crystallographic Fourier Transform')
-            plt.xlabel('Reciprocal Space (k_x)')
-            plt.ylabel('Reciprocal Space (k_y)')
-            plt.savefig(str(superfilename) + "\\FFT_"+str(recursions)+".png",dpi=400)
+            xmin = np.min(totalVertices[:,0])
+            xmax = np.max(totalVertices[:,0])
+            ymin = np.min(totalVertices[:,1])
+            ymax = np.max(totalVertices[:,1])
+            xs = xmax - xmin
+            ys = ymax-ymin
+            res = 1024
+            maxWidth = 1.01*max(xs,ys)
+            centerX = (xmax+xmin)/2
+            centerY = (ymax+ymin)/2
+
+            aperture = np.zeros((res, res), dtype=complex)
+            for vertex in totalVertices:
+                x, y = vertex
+                cx = int(res/2)+int((x-centerX)*res/maxWidth)
+                cy = int(res/2)+int((y-centerY)*res/maxWidth)
+                aperture[cx,cy] = 1.0
+            fft_result = np.fft.fft2(aperture)
+            fft_result = np.fft.fftshift(fft_result)
+            fft_result = np.abs(fft_result)
+            fft_result = gaussian_filter(fft_result,2)
+            # fft_result = np.log(fft_result)
+            plt.xticks([])
+            plt.yticks([])
+            plt.axis('off')
+            plt.gca().set_aspect('equal')
+            plt.imshow(fft_result)
+            plt.tight_layout()
+            plt.savefig(str(superfilename) + "\\FFT_"+str(res)+".png",dpi=600)
             plt.close('all')
+            exit()
 # draws out things and save them as necessary - stops program to verify evaluating what you want
 if True:
     if not os.path.exists(superfilename):
@@ -1066,16 +1101,33 @@ if not hexOnly and showVertices:
     for row in totalAdj:
         if np.sum(row) == 0:
             actives -= 1
+    blockInd = 0
     for i in range(len(totalVertices)):
-        col = get_col(i)
-        if i in is_edge_dict:
-            col = (0, 0, 1)
-        if i in newmap:
-            if i != newmap[i]:
-                continue
+        if vertColor == 2:
+            if i > blockoffsets[blockInd]+size_list[blockInd]:
+                blockInd += 1
+            modI = i - blockoffsets[blockInd]
+            NG = True
+            edgeList = elseEdge
+            if size_list[blockInd] == 71:
+                NG = False
+                edgeList=gammaEdge
+            if modI in edgeList:
+                col = (1,0,0)
             else:
+                col = (0,0,0)
+        elif vertColor == 0:
+            col = get_col(i)
+            if i in is_edge_dict:
                 col = (0, 0, 1)
-        col = (0,0,0) # TODO
+            if i in newmap:
+                if i != newmap[i]:
+                    continue
+                else:
+                    col = (0, 0, 1)
+        elif vertColor == 1:
+            col = (0,0,0)
+
         x.append(totalVertices[i, 0])
         y.append(totalVertices[i, 1])
         cols.append(col)
@@ -1085,7 +1137,7 @@ if not hexOnly and showVertices:
     #     plt.text(x[i], y[i], str(i), fontsize=12, ha='center', va='center')
 
 if saveVerts and showVertices:
-    vertfilename = "Verts" + str(iList)
+    vertfilename = "Verts" + str(iList)+"_"+str(vertColor)
     hexfilename = "Metatiles" + str(iList) + "_Verts"
     plt.axis('tight')
     # plt.title("Patch Vertices")
@@ -1227,6 +1279,8 @@ if hexTB and doGammaGammaScheme:
 if doProjections and not hexOnly:
     filterNullRows = True
     if filterNullRows:
+        print("")
+        print("Generating Projectors...")
         projectors = dict()
         projectSpectra = dict()
         projectStates = dict()
@@ -1234,17 +1288,29 @@ if doProjections and not hexOnly:
         # strip dead states
         row_sums = np.sum(totalAdj, axis=1)
         col_sums = np.sum(totalAdj, axis=0)
-        valid_rows = np.where(row_sums != 0)[0]
-        valid_cols = np.where(col_sums != 0)[0]
+        if doDefects:
+            print("Defecting:",defectList)
+            valid_rows = [int(i) for i, x in enumerate(row_sums) if
+                          (i not in defectList) and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+            valid_cols = [int(i) for i, x in enumerate(col_sums) if
+                          (i not in defectList) and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
+            valid_rows = np.array(valid_rows)
+            valid_cols = np.array(valid_cols)
+        else:
+            valid_rows = np.where(row_sums != 0)[0]
+            valid_cols = np.where(col_sums != 0)[0]
         sAdj = totalAdj[valid_rows][:, valid_cols]
         sVert = totalVertices[valid_rows]
         sSize = len(sAdj)
+        print("Presize:",totalSize,"Postsize:",sSize)
         # generate projectors
-        print("Generating Projectors...")
+        totalEdges = set()
         for i, ind in enumerate(ind_list):
             Pi = np.zeros((sSize,sSize))
             blockLow = blockoffsets[i]
             blockHigh = blockLow + size_list[i]
+            edgeIndices = []
+            foundEdges = []
             for j in range(totalSize):
                 if j in range(blockLow, blockHigh):
                     j1 = j
@@ -1253,7 +1319,17 @@ if doProjections and not hexOnly:
                             break
                         j1 = newmap[j1]
                     js = np.where(valid_rows == j1)[0]
-                    Pi[js,js] = 1
+                    for ii, subInd in enumerate(ind_list):
+                        NG = (size_list[ii] != 71)
+                        if NG:
+                            edgeIndices = elseEdge
+                        else:
+                            edgeIndices = gammaEdge
+                        if j1 - blockoffsets[ii] in edgeIndices:
+                            foundEdges.append(js[0])
+                            break
+                    Pi[js, js] = 1
+            totalEdges = totalEdges | set(foundEdges)
             projectors[ind] = Pi
             # full projector in full basis
             Hmod = np.dot(np.dot(Pi, sAdj), Pi)  # PiHPi
@@ -1267,7 +1343,7 @@ if doProjections and not hexOnly:
             hcol_sums = np.sum(Hmod, axis=0)
             hvalid_rows = np.where(hrow_sums != 0)[0]
             hvalid_cols = np.where(hcol_sums != 0)[0]
-            sHmod = Hmod[hvalid_rows][:, hvalid_cols] # just the projector subspace
+            sHmod = Hmod[hvalid_rows][:, hvalid_cols]  # just the projector subspace
             # diagonalize in full rank projector basis (ie not a ton of vacuum states)
             e_values, e_vec = np.linalg.eigh(-sHmod)
             projectSpectra[ind] = e_values
@@ -1276,7 +1352,7 @@ if doProjections and not hexOnly:
             prerank = int(np.trace(Pi))
             for j, row_idx in enumerate(hvalid_rows):
                 for k in range(prerank):
-                    output[row_idx, k] = e_vec[j, k] # first prerank columns are the actual eigenstates
+                    output[row_idx, k] = e_vec[j, k]  # first prerank columns are the actual eigenstates
             vacHold = prerank
             for j in range(sSize): # locks gauge in nullranked rows to make them vacuum states
                 if j not in hvalid_rows:
@@ -1295,6 +1371,8 @@ if doProjections and not hexOnly:
                     drawIndivState(fname,pname,oname,sHmod,sVert[hvalid_rows],projectStates[ind][:,j][hvalid_rows],wfc=True,doLog=False)
                 # drawStates(-Hmod, sVert, "Projector_Patch" + str(iList) + "_Tile" + str(ind) + "_" + centers[ind][1],
                 #            doSpectrum, doIndivs, doBands, [1, 4, 8], lowE=0, highE=70)
+        totalEdges = sorted(list(totalEdges))
+        print("All Edges", len(totalEdges))
         if verifyProjectors:
             print("Verifying Projectors...")
             sum = np.zeros((sSize,sSize))
@@ -1527,7 +1605,7 @@ if doProjections and not hexOnly:
 
             # looking at the "tilenorm" = sum_i->dim(A) |<Psi_tot_0|Psi_A_i>|^2 versus "how completely the ground state captures"
             # |<Psi_tot_0|Psi_A_0>|^2/tilenorm
-            doTileNorm = True
+            doTileNorm = False
             if doTileNorm:
                 totalStatesCounted = indSize
                 storage = np.zeros((totalStatesCounted,78,indSize))
@@ -1596,6 +1674,110 @@ if doProjections and not hexOnly:
                 plt.savefig(superfilename+"\\Cn0.png",dpi=400)
                 # plt.show()
 
+            # look at how much weight on the edges near the midgap
+            doEdgeWeighting = True
+            if doEdgeWeighting:
+                eNums = 60
+                Midgaps = list(range(sSize))
+                olaps = []
+                ens = []
+                for index in Midgaps:
+                    overlap = 0
+                    for edge in totalEdges:
+                        overlap+=np.square(np.abs(totalStates[edge,index]))
+                    olaps.append(overlap)
+                    ens.append(totalSpectrum[index])
+                plt.close('all')
+                plt.plot(ens,olaps, marker='o', linestyle='-', color='b', label='Edge Weight')
+                plt.xlabel('Energy (units of $\mathit{t}$)')
+                plt.ylabel('Percent of State on Tile Edges')
+                plt.ylim(0,1.2*max(olaps))
+                plt.title('Edge Weight for Patch '+str(iList))
+                plt.legend()
+                plt.savefig(superfilename+'\\edgeweight'+str(eNums)+'.png')
+
+            doDoubleWeighting = True
+            if doDoubleWeighting:
+                Midgaps = list(range(sSize))
+                eNums = len(Midgaps)
+                doubles = []
+                cDoubles = []
+                eDoubles = []
+                sDoubles = []
+                triples = []
+                quads = []
+                for s in range(sSize):
+                    rsum  = np.sum(sAdj[s])
+                    if rsum == 2:
+                        if s in totalEdges:
+                            if s in newmap or s in newmap.values():
+                                sDoubles.append(s)
+                            else:
+                                eDoubles.append(s)
+                        else:
+                            cDoubles.append(s)
+                        doubles.append(s)
+                    elif rsum == 3:
+                        triples.append(s)
+                    elif rsum == 4:
+                        quads.append(s)
+                    else:
+                        print("FUCK")
+                print("Doubles, Centers Doubles, Edge Doubles, Shared Doubles:",len(doubles),len(cDoubles),len(eDoubles),len(sDoubles))
+                olaps = []
+                centerTwo = []
+                edgeTwo = []
+                sharedTwo = []
+                Three = []
+                Four = []
+                ens = []
+                for index in Midgaps:
+                    overlap, oEdge, oCenter, oShared = 0,0,0,0
+                    oTrip, oQuad = 0,0
+                    state = totalStates[:,index]
+                    for doub in cDoubles:
+                        oCenter += np.square(np.abs(state[doub]))
+                    for doub in eDoubles:
+                        oEdge += np.square(np.abs(state[doub]))
+                    for doub in sDoubles:
+                        oShared += np.square(np.abs(state[doub]))
+                    for trip in triples:
+                        oTrip += np.square(np.abs(state[trip]))
+                    for quad in quads:
+                        oQuad += np.square(np.abs(state[quad]))
+                    centerTwo.append(oCenter)
+                    edgeTwo.append(oEdge)
+                    sharedTwo.append(oShared)
+                    Three.append(oTrip)
+                    Four.append(oQuad)
+                    overlap = oCenter + oEdge + oShared
+                    olaps.append(overlap)
+                    ens.append(totalSpectrum[index])
+                plt.close('all')
+                fig = plt.figure(figsize=(10, 6))
+                plt.cla()
+                gs = gridspec.GridSpec(1, 2, width_ratios=[0.90, .1])  # Graph space, Legend space
+                ax = plt.subplot()
+                ax.plot(ens,olaps, color='b', label='Total Double Weight')
+                ax.plot(ens,centerTwo,  color='r', label='Center Double Weight')
+                ax.plot(ens,sharedTwo,  color='g', label='Shared Double Weight')
+                ax.plot(ens,edgeTwo, color='y', label='Edge Double Weight')
+                ax.plot(ens,Three,color='orange',label="Triple Weight")
+                ax.plot(ens,Four,color='m',label="Quad Weight")
+                plt.axhline(y=len(doubles)/len(sAdj), color='red', linestyle='--', label='% 2-coordinated')
+                ax.set_xlabel('Energy (units of $\mathit{t}$)')
+                ax.set_ylabel('Percent of State on Vertex Type')
+                plt.ylim(0,1.2*max(olaps))
+                ax.set_title('Vertex Weights for Patch '+str(iList))
+                plt.legend()
+                plt.savefig(superfilename+'\\doubleweight'+str(eNums)+'.png')
+
+            verifyEigvals = False
+            if verifyEigvals:
+                tests = [random.randint(0, sSize) for _ in range(50)]
+                for test in tests:
+                    psi = totalStates[:,test]
+                    print("Testing Eigval",test," Gap:",np.abs(np.dot(np.conj(psi),np.dot(-sAdj,psi))-totalSpectrum[test]))
 
             # TODO NOT REAL LINEAR ALGEBRA, SECTIONS BELOW NOT VERIFIED
             # <psi_tot|psi_{alpha}_{J}> = sum_i(sum_J(sum_alpha(<psi_tot|i><i|phi_j_alpha><phi_j_alpha|psi_tile>)))
@@ -1715,6 +1897,7 @@ if doProjections and not hexOnly:
 
 # solve the states for all vertices using H_tot (totalAdJ)
 if doVertexStates and not hexOnly:
+    print("")
     print("Generating Vertex States...")
     drawStates(-totalAdj, totalVertices, superfilename, doSpectrum, doIndivs, doBands, bandList, stateNumLow,
-               stateNumHigh,gammas=gammasIn)
+               stateNumHigh,gammas=gammasIn,defects=doDefects)

@@ -11,16 +11,17 @@ from PIL import Image
 import os
 
 # HYPERPARAMETERS
-plotBorders = True
+plotBorders = False
 supergrid = False # has to do with putting balls into each spectre, false no balls
 draw1 = True  # uses original polygon method in sys translated draw metatiles submethod, other used by meta.py
 auxcurve = .25
 linethickness = 3
 linedensity = 10
-recursions = 0
+recursions = 3
 balls = 30
 tile_sel = "Psi"
 fname = "BasicImages"
+storageFolder = "RandomFiles"
 
 if not os.path.exists(fname):
     os.makedirs(fname)
@@ -49,6 +50,7 @@ if True:
             sys = buildSupertiles(sys) # loads datat in to ax.patches
         patchlist = list()  # things to draw inside the spectres
         if plotCO and not supergrid:
+            print("Making Balls...")
             for point in pointlist:
                 ball = plt.Circle((point[0], point[1]), radius=ballsize, color='black')
                 patchlist.append(ball)
@@ -69,18 +71,18 @@ if True:
                 y = points[:, 1]
                 plt.gca().plot(x, y, color='black')
                 plt.gca().fill(x, y, color='black', alpha=1)
+        plt.tight_layout()
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
     def remove_duplicates_with_tolerance(coordinates, tolerance=0.01):
+        print("Stripping Duplicates....")
         unique_coordinates = set()
         unique_list = []
-
         for coord in coordinates:
             rounded_coord = np.round(coord / tolerance) * tolerance
             if tuple(rounded_coord) not in unique_coordinates:
                 unique_coordinates.add(tuple(rounded_coord))
                 unique_list.append(coord)
-
         return unique_list
 
     # Load data from file to draw in circles
@@ -88,11 +90,12 @@ if True:
         curve = auxcurve
     else:
         if plotCO:
-            with open('metadata_' + name + '.pkl', 'rb') as f:
+            print("Loading Balls...")
+            with open(storageFolder+'\\metadata_' + name + '.pkl', 'rb') as f:
                 meta = pickle.load(f)
             curve = meta[0]
             ballsize = meta[1]
-            with open('pointlist_' + name + '.pkl', 'rb') as f:
+            with open(storageFolder+'\\pointlist_' + name + '.pkl', 'rb') as f:
                 pointlist = pickle.load(f)
         else:
             curve = auxcurve
@@ -115,11 +118,10 @@ if True:
         "savefig.facecolor": "white",
         "savefig.edgecolor": "black"})
     plt.axis('off')
-    folderName = "RandomFiles\\"
-    fig.savefig("RandomFiles\\"+'out_' + name + '.png', bbox_inches='tight', transparent=False, pad_inches=0)
-    image = Image.open("RandomFiles\\"'out_' + name + '.png')
+    fig.savefig(storageFolder+"\\"+'out_' + name + '.png', bbox_inches='tight', transparent=False, pad_inches=0)
+    image = Image.open(storageFolder+"\\"+'out_' + name + '.png')
     new_image = image.resize((64, 64))
-    new_image.save("RandomFiles\\"+'out_64_' + name + '.png')
+    new_image.save(storageFolder+"\\"+'out_64_' + name + '.png')
     filename = "Rec_" + str(recursions) + "_Tile" + tile_sel
 
 # Create adjacency matrix for use in all further
@@ -458,7 +460,7 @@ if siteVerify:
     print(atype, btype, acoord, bcoord)
 
 # Plot Graph show the tiles in a consideration circle with or without labels
-showGraph = True
+showGraph = False
 showCircle = False # Big Block of solid connections used for vertex analysis in nn2 and nn3 models (A2222 etc)
 if showGraph:
     custom_color_dict = {
@@ -552,7 +554,7 @@ if doStates:
         os.mkdir(filename)
     if makeSpectrum:
         def lorentzian(x, x0, gamma):
-            return 1.0 / (np.pi * np.pi * gamma * (1.0 + ((x - x0) / gamma) ** 2))
+            return 1.0 / (np.pi * np.pi * gamma * (1.0 + ((x - x0) / gamma) ** 2)) # TODO
         positions = [x for x in e_values if abs(x) > .01]
         gamma = 0.1
         x = np.linspace(min(e_values) - .5, max(e_values) + .5, 1000)

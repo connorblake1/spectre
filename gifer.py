@@ -2,7 +2,7 @@ import os
 from PIL import Image
 import re
 
-input_folder = 'Patch3_ConnectTrue'
+input_folder = 'Patch3_ConnectTrue_complete'
 output_gif = 'output.gif'
 
 png_files = [f for f in os.listdir(input_folder) if re.match(r'linLin_(\d+)_.*\.png', f)]
