@@ -14,11 +14,11 @@ import os
 plotBorders = False
 supergrid = False # has to do with putting balls into each spectre, false no balls
 draw1 = True  # uses original polygon method in sys translated draw metatiles submethod, other used by meta.py
-auxcurve = .25
+auxcurve = .1
 linethickness = 3
 linedensity = 10
-recursions = 3
-balls = 30
+recursions = 1
+balls = 35
 tile_sel = "Psi"
 fname = "BasicImages"
 storageFolder = "RandomFiles"
@@ -42,6 +42,7 @@ if True:
         else:
             name = str(balls)
         name += "_" + str(auxcurve)
+        print("Saving to",name)
     def draw_moves(dummy):
         plt.cla()
         plt.axis('off')
@@ -57,6 +58,7 @@ if True:
         sys[tile_sel].draw(ident, ax, plotBorders, patchlist,draw1)
         global vertices
         vertices = []
+        ballvertices = []
         for patch in ax.patches:  # pull the vertices from the generated polygons (hidden) to make bezier splines
             if isinstance(patch, plt.Polygon):
                 patch.set_alpha(0)
@@ -69,11 +71,90 @@ if True:
                 points = patch.get_verts()
                 x = points[:, 0]
                 y = points[:, 1]
+                ballvertices.append(np.array([np.average(x),np.average(y)]))
                 plt.gca().plot(x, y, color='black')
                 plt.gca().fill(x, y, color='black', alpha=1)
         plt.tight_layout()
         plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
+        plt.savefig(storageFolder +"\\" + name+ ".png", dpi=600)
+        plt.cla()
+        # plot lattice points
+        gridshift = np.array([-12, -8.5])
+        extentX = 10
+        extentY = 9
+        gridvec = .25
+        gx = int((extentX - gridshift[0]) / gridvec)
+        gy = int((extentY - gridshift[1]) / gridvec)
+        s3 = np.sqrt(3)
+        a1 = gridvec * np.array([1, 0])
+        a2 = gridvec * np.array([.5, s3 / 2])
+        ontop = gridvec * np.array([0, 0])
+        fcc = gridvec * np.array([.5, s3 / 6])
+        bridge = gridvec * np.array([.5, 0.0])
+        hcp = gridvec * np.array([1.0, s3 / 3])
+        shifts = [ontop, fcc]
+        # snap to grid
+        setCOs = []
+        repel= False
+        print("Saving to","Modded_" + name+ "_"+str(gridvec)+"_"+str(repel))
+        for ball in ballvertices:
+            gap = 100
+            holdlat = None
+            bv = ball
+            for x in range(gx):
+                for y in range(gy):
+                    for shifter in shifts:
+                        lat = x * a1 + y * a2 + gridshift + shifter
+                        dist = np.linalg.norm(bv-lat)
+                        if dist < gap:
+                            holdlat = lat
+                            gap = dist
+            cycling = 0
+            while repel: # add repulsion and delete duplicates
+                breaker = True
+                breakVec = None
+                for b2 in setCOs:
+                    dist = np.linalg.norm(holdlat-b2)
+                    if dist < .01*gridvec:
+                        # literal duplicates
+                        break
+                    elif dist < gridvec*1.1:
+                        breaker = False
+                        breakVec = b2
+                if breaker:
+                    break
+                else:
+                    reshift = -1
+                    reVec = None
+                    relVec = holdlat-breakVec
+                    shiftDir = [-1,1]
+                    shiftList = shifts[1:] + [a1,a2]
+                    for dir in shiftDir:
+                        for shift in shiftList:
+                            dp = np.dot(dir*shift,relVec)#+np.random.uniform(-.05,.05)
+                            if dp > reshift:
+                                reshift = dp
+                                reVec = dir*shift
+                    holdlat += reVec
+                cycling += 1
+                if cycling > 4:
+                    break
+            setCOs.append(np.array([holdlat[0], holdlat[1]]))
+            plt.gca().add_patch(plt.Circle((holdlat[0], holdlat[1]), radius=gridvec/1.5, picker=False, fc='black', ec='black'))
+        plt.gca().autoscale_view()
+        plt.tight_layout()
+        plt.gca().set_aspect('equal')
+        plt.xticks([])
+        plt.yticks([])
+        plt.savefig(storageFolder +"\\Modded_" + name+ "_"+str(gridvec)+"_"+str(len(shifts))+"_"+str(repel)+".png", dpi=600)
+        for x in range(gx):
+            for y in range(gy):
+                for i,shifter in enumerate(shifts):
+                    lat = x*a1+y*a2+gridshift+shifter
+                    lat = plt.Circle((lat[0],lat[1]), radius=gridvec/5, picker=True, fc='none', ec=(float(i*.5+.5),0,0),zorder=0)
+                    plt.gca().add_patch(lat)
+        plt.savefig(storageFolder +"\\GriddyModded_" + name+ "_"+str(gridvec)+"_"+str(len(shifts))+"_"+str(repel)+".png", dpi=600)
+
     def remove_duplicates_with_tolerance(coordinates, tolerance=0.01):
         print("Stripping Duplicates....")
         unique_coordinates = set()
@@ -100,7 +181,7 @@ if True:
         else:
             curve = auxcurve
     # Plot
-    fig, ax = plt.subplots(facecolor='black')
+    fig, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)
     draw_moves(0)
     plt.rcParams.update({
@@ -123,6 +204,8 @@ if True:
     new_image = image.resize((64, 64))
     new_image.save(storageFolder+"\\"+'out_64_' + name + '.png')
     filename = "Rec_" + str(recursions) + "_Tile" + tile_sel
+if plotCO:
+    exit()
 
 # Create adjacency matrix for use in all further
 unique = remove_duplicates_with_tolerance(vertices, .01)  # remove duplicates

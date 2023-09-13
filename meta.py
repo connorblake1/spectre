@@ -771,13 +771,11 @@ if doGammaGammaScheme:
     # for key in gdict:
     #     print(key,gdict[key])
 
-
-
 # Build ind_list
-iList = -2  # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
+iList = 2  # which set of patches - see inside to choose - (all work for 3,4 recursions, 10+ should be used only with 4)
 if True:
     if iList == -1:
-        ind_list = [478]
+        ind_list = [450]
     elif iList == -2:
         ind_list = [7]
     elif iList == -3:
@@ -1009,7 +1007,7 @@ if True:
             xs = xmax - xmin
             ys = ymax-ymin
             res = 1024
-            maxWidth = 1.01*max(xs,ys)
+            maxWidth = 1.1*max(xs,ys)
             centerX = (xmax+xmin)/2
             centerY = (ymax+ymin)/2
 
@@ -1022,15 +1020,39 @@ if True:
             fft_result = np.fft.fft2(aperture)
             fft_result = np.fft.fftshift(fft_result)
             fft_result = np.abs(fft_result)
-            fft_result = gaussian_filter(fft_result,2)
-            # fft_result = np.log(fft_result)
+            # fft_result = gaussian_filter(fft_result,2)
+            fft_result /= np.max(fft_result)
+            thresh = .2
+            for x in range(res):
+                for y in range(res):
+                    val = fft_result[x,y]
+                    if val > thresh:
+                        kill = 8
+                        maxval = val
+                        im = 0
+                        jm = 0
+                        for i in range(-kill, kill+1):
+                            for j in range(-kill, kill+1):
+                                if i + x < res and j + y < res:
+                                    if fft_result[x+i,y+j] > maxval:
+                                        maxval = fft_result[x+i,y+j]
+                                        im = i
+                                        jm = j
+                                    fft_result[x+i,y+j] = 0
+                        plt.gca().add_patch(plt.Circle((x+im,y+jm), radius=10*maxval, color='black', fill=True))
+
+
             plt.xticks([])
             plt.yticks([])
-            plt.axis('off')
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.gca().spines['bottom'].set_visible(False)
+            plt.gca().spines['left'].set_visible(False)
+            plt.gca().autoscale_view()
             plt.gca().set_aspect('equal')
-            plt.imshow(fft_result)
+            # plt.imshow(fft_result)
             plt.tight_layout()
-            plt.savefig(str(superfilename) + "\\FFT_"+str(res)+".png",dpi=600)
+            plt.savefig(str(superfilename) + "\\FFT_"+str(res)+"_"+str(thresh)+".png",dpi=600)
             plt.close('all')
             exit()
 # draws out things and save them as necessary - stops program to verify evaluating what you want
@@ -1706,6 +1728,7 @@ if doProjections and not hexOnly:
                 sDoubles = []
                 triples = []
                 quads = []
+                alledges = []
                 for s in range(sSize):
                     rsum  = np.sum(sAdj[s])
                     if rsum == 2:
@@ -1731,46 +1754,57 @@ if doProjections and not hexOnly:
                 Three = []
                 Four = []
                 ens = []
-                for index in Midgaps:
-                    overlap, oEdge, oCenter, oShared = 0,0,0,0
-                    oTrip, oQuad = 0,0
-                    state = totalStates[:,index]
-                    for doub in cDoubles:
-                        oCenter += np.square(np.abs(state[doub]))
-                    for doub in eDoubles:
-                        oEdge += np.square(np.abs(state[doub]))
-                    for doub in sDoubles:
-                        oShared += np.square(np.abs(state[doub]))
-                    for trip in triples:
-                        oTrip += np.square(np.abs(state[trip]))
-                    for quad in quads:
-                        oQuad += np.square(np.abs(state[quad]))
-                    centerTwo.append(oCenter)
-                    edgeTwo.append(oEdge)
-                    sharedTwo.append(oShared)
-                    Three.append(oTrip)
-                    Four.append(oQuad)
-                    overlap = oCenter + oEdge + oShared
-                    olaps.append(overlap)
-                    ens.append(totalSpectrum[index])
-                plt.close('all')
-                fig = plt.figure(figsize=(10, 6))
-                plt.cla()
-                gs = gridspec.GridSpec(1, 2, width_ratios=[0.90, .1])  # Graph space, Legend space
-                ax = plt.subplot()
-                ax.plot(ens,olaps, color='b', label='Total Double Weight')
-                ax.plot(ens,centerTwo,  color='r', label='Center Double Weight')
-                ax.plot(ens,sharedTwo,  color='g', label='Shared Double Weight')
-                ax.plot(ens,edgeTwo, color='y', label='Edge Double Weight')
-                ax.plot(ens,Three,color='orange',label="Triple Weight")
-                ax.plot(ens,Four,color='m',label="Quad Weight")
-                plt.axhline(y=len(doubles)/len(sAdj), color='red', linestyle='--', label='% 2-coordinated')
-                ax.set_xlabel('Energy (units of $\mathit{t}$)')
-                ax.set_ylabel('Percent of State on Vertex Type')
-                plt.ylim(0,1.2*max(olaps))
-                ax.set_title('Vertex Weights for Patch '+str(iList))
-                plt.legend()
-                plt.savefig(superfilename+'\\doubleweight'+str(eNums)+'.png')
+                doWeightPlotting = False
+                if doWeightPlotting:
+                    for index in Midgaps:
+                        overlap, oEdge, oCenter, oShared = 0,0,0,0
+                        oTrip, oQuad = 0,0
+                        state = totalStates[:,index]
+                        for doub in cDoubles:
+                            oCenter += np.square(np.abs(state[doub]))
+                        for doub in eDoubles:
+                            oEdge += np.square(np.abs(state[doub]))
+                        for doub in sDoubles:
+                            oShared += np.square(np.abs(state[doub]))
+                        for trip in triples:
+                            oTrip += np.square(np.abs(state[trip]))
+                        for quad in quads:
+                            oQuad += np.square(np.abs(state[quad]))
+                        centerTwo.append(oCenter)
+                        edgeTwo.append(oEdge)
+                        sharedTwo.append(oShared)
+                        Three.append(oTrip)
+                        Four.append(oQuad)
+                        overlap = oCenter + oEdge + oShared
+                        olaps.append(overlap)
+                        ens.append(totalSpectrum[index])
+                    plt.close('all')
+                    fig = plt.figure(figsize=(10, 6))
+                    plt.cla()
+                    gs = gridspec.GridSpec(1, 2, width_ratios=[0.90, .1])  # Graph space, Legend space
+                    ax = plt.subplot()
+                    ax.plot(ens,olaps, color='b', label='Total Double Weight')
+                    ax.plot(ens,centerTwo,  color='r', label='Center Double Weight')
+                    ax.plot(ens,sharedTwo,  color='g', label='Shared Double Weight')
+                    ax.plot(ens,edgeTwo, color='y', label='Edge Double Weight')
+                    # ax.plot(ens,Three,color='orange',label="Triple Weight")
+                    # ax.plot(ens,Four,color='magenta',label="Quad. Weight")
+                    plt.axhline(y=len(doubles)/sSize, color='blue', linestyle='--', label='% 2-coordinated')
+                    # plt.axhline(y=len(triples)/sSize,color='orange',linestyle='--',label="% 3-coordinated")
+                    # plt.axhline(y=len(quads)/sSize,color='magenta',linestyle='--',label="% 4-coordinated")
+                    ax.set_xlabel('Energy (units of $\mathit{t}$)')
+                    ax.set_ylabel('Percent of State on Vertex Type')
+                    plt.ylim(0,1.2*max(olaps))
+                    ax.set_title('Vertex Weights for Patch of '+str(indSize)+ " Tiles")
+                    plt.legend()
+                    plt.savefig(superfilename+'\\doubleweight'+str(eNums)+'.png')
+                doEdgeStates = True
+                if doEdgeStates:
+                    dlist = np.array(totalEdges)
+                    Hedge = sAdj[dlist][:, dlist]
+                    Sedge = sVert[dlist]
+                    print("Drawing Edges Only")
+                    drawStates(-Hedge,Sedge,"EdgesOnly"+str(iList),True,True,False,lowE=260,highE=280)
 
             verifyEigvals = False
             if verifyEigvals:
