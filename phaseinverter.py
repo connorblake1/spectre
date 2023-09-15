@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
 # MICKEY MOUSE PHASE INVERSION - JUST INVERT THE RED AND BLUE PIXELS
-folder = "Patch2_ConnectTrue"
+folder = "Patch2_ConnectTrue_good"
 filename = "linLin_19_e_-2.386_"
 image_path = folder + "\\" + filename + ".png"
 image = Image.open(image_path)

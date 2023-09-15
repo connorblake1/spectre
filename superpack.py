@@ -28,12 +28,14 @@ from matplotlib.path import Path
 from random import randrange
 import pickle
 
-rmult = 2
-bbmult = 3
-curve = 0.25
+rmult = 2.75 # distance from walls
+bbmult = 3 # distance from each other
+curve = 0.1
 sbox=1
-balls = 30
-ballsize = .2*sbox
+balls = 35 # 30
+ballsize = .16*sbox # .2
+
+storageFolder = "RandomFiles"
 def forcefield(dist, range): # ball to ball
     def f(r, range):
         # return 80*sbox/25 * np.exp(-r*1 / range)
@@ -42,6 +44,15 @@ def forcefield(dist, range): # ball to ball
     return f(dist, range) - f(range, range)
 def forcefield2(dist,range): # ball to wall
     return -.1 * abs(dist -rmult*range) #INVERT IF PATH DIRECTION CHANGES
+def forcefield3(dist,range): # grid to ball
+    k = 3
+    ab = gridvec/2
+    cut = range
+    if dist > cut:
+        return 0
+    def field(di,a):
+        return -2*(di/a/a)/np.square(di*di/a/a+k/a)
+    return field(dist,ab)-field(dist,cut)
 class Ball:
     def __init__(self, x, y, radius):
         self.r = radius
@@ -89,12 +100,33 @@ class Pack:
         for ball in self.list_balls:
             self.checkBorders(ball)
             self.applySeparationForcesToBall(ball)
+            self.snapGrid(ball)
         return self.freeze()
-    def checkBorders(self, ball):
+    def snapGrid(self,ball):
+        # central repulsion force doesn't work
+        # cx = -2
+        # cy = -.2
+        # n_v = np.array([cx-ball.x,cy-ball.y])
+        # d = np.linalg.norm(n_v)
+        # n_v = n_v / d
+        # ball.applyForce(n_v*forcefield3(d,1))
+        # forcefield on particles takes too long, different spectres with different rotations won't work
+        # totalForce = np.array([0.0, 0.0])
+        # pos = np.array([ball.x,ball.y])
+        # for x in range(gx):
+        #     for y in range(gy):
+        #         lat = x * a1 + y * a2 + gridshift
+        #         if self.polygon_path.contains_point(lat.tolist()):
+        #             n_v = pos-lat
+        #             dist = np.linalg.norm(n_v)
+        #             n_v /= dist
+        #             totalForce += n_v*forcefield3(dist,gridvec)
+        # ball.applyForce(totalForce)
+        pass
+    def minWallDist(self,ball):
         closest_line = None
         min_distance = float('inf')
         vertices = self.borders
-        cpoint = None
         point = [ball.x,ball.y]
         for i in range(len(vertices)):
             start_point = vertices[i]
@@ -109,8 +141,12 @@ class Pack:
             # Update minimum distance and closest line segment
             if distance < min_distance:
                 min_distance = distance
-                cpoint = closest_point
                 closest_line = (start_point, end_point)
+        return closest_line,min_distance
+    def checkBorders(self, ball):
+
+        closest_line, min_distance = self.minWallDist(ball)
+
         boundtrigger = 0
         if not self.polygon_path.contains_point([ball.x,ball.y]):
             boundtrigger = 1
@@ -126,7 +162,7 @@ class Pack:
             ball.applyForce(n_v*boundtrigger*forcefield2(min_distance,ball.r))
     def freeze(self):
         for ball in self.list_balls:
-            if np.linalg.norm(ball.velocity) > .05*sbox/25:
+            if np.linalg.norm(ball.velocity) > .25*sbox/25:
                 return False,None
         output = []
         if not self.nudge:
@@ -137,7 +173,8 @@ class Pack:
                     ball.applyForce([scale*(random()*2-1),scale*(random()*2-1)])
             return False,None
         for ball in self.list_balls:
-            if self.polygon_path.contains_point([ball.x, ball.y]):
+            _,ld = self.minWallDist(ball)
+            if self.polygon_path.contains_point([ball.x, ball.y]) and abs(ld) < 1.5*rmult*ball.r:
                 ball.velocity *= 0
                 output.append([ball.x,ball.y])
         return True,output
@@ -151,12 +188,9 @@ class Pack:
             steer = diff
         return steer
     def _distanceBalls(self, c1, c2):
-
         x1, y1 = c1.x, c1.y
         x2, y2 = c2.x, c2.y
-
         dist = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-
         return dist
     def applySeparationForcesToBall(self, ball):
         i = self.list_balls.index(ball)
@@ -219,10 +253,11 @@ else:
         done,output = p.run()
         if done:
             name = str(balls)+"_"+str(curve)
-            with open('pointlist_'+name+'.pkl', 'wb') as f:
+            with open(storageFolder+'\\pointlist_'+name+'.pkl', 'wb') as f:
                 pickle.dump(output, f)
-            with open('metadata_'+name+'.pkl', 'wb') as f:
+            with open(storageFolder+'\\metadata_'+name+'.pkl', 'wb') as f:
                 pickle.dump([curve,ballsize], f)
+            print("Dumped. Exiting.",name)
             exit()
         ax.cla()
         ax.add_patch(p.poly)

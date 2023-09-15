@@ -6,7 +6,6 @@ from scipy.linalg import null_space
 from scipy.sparse.linalg import eigsh as scipy_eigsh
 from scipy.sparse import csr_matrix
 from scipy.linalg import eigh as scipy_eigh
-from scipy.linalg import eigh as scipy_eig
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.distance import cdist
 from scipy import signal
@@ -26,6 +25,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
+from matplotlib.colors import ListedColormap
 from collections import namedtuple
 from matplotlib.artist import Artist
 import matplotlib.transforms as mtransforms

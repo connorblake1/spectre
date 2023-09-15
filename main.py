@@ -637,7 +637,7 @@ if doStates:
         os.mkdir(filename)
     if makeSpectrum:
         def lorentzian(x, x0, gamma):
-            return 1.0 / (np.pi * np.pi * gamma * (1.0 + ((x - x0) / gamma) ** 2)) # TODO
+            return 1.0 / (np.pi * np.pi * gamma * (1.0 + ((x - x0) / gamma) ** 2))
         positions = [x for x in e_values if abs(x) > .01]
         gamma = 0.1
         x = np.linspace(min(e_values) - .5, max(e_values) + .5, 1000)

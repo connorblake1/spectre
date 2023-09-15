@@ -1,4 +1,6 @@
 import os
+
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fft
 from translated import *
@@ -145,7 +147,6 @@ def showHex(ind, show_edges_labels, rotate_name, axin, axHold, type, adjM=None, 
         #         rotation=-orie * 60 + 30)
         # axin.text(centerxyH[0], centerxyH[1] + .15, ind, color='white', size=8, ha='center', va='center')
 
-
 # Based on flawed "edge balance" hypothesis
 def computeEdgeBalanceIndiv(ind):
     return edge_bal[centers[ind][1]]
@@ -208,7 +209,7 @@ def remove_close_duplicates(vertices, threshold=0.1):
 def lorentzian(x, x0, gamma):
         return 1.0 / np.pi / gamma / (1.0 + ((x - x0) / gamma) ** 2)
 
-def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
+def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False,allReal=True,scaleName='Wave Function Amplitude'):
     vertnumt = len(uni)
 
     plt.close('all')
@@ -219,7 +220,7 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
     if wfc:
         if doLog:
             ncut = 1E-4
-            state = state*state
+            state = np.square(np.abs(state))
             state = np.maximum(state,ncut)
             absMax = max(state)
             cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['white', 'red'])
@@ -230,22 +231,34 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
             cbar.set_label('Wave Function Norm')
         else:
             ncut = "lin"
-            rHigh = max(state)
-            rLow = min(state)
-            absMax = max(abs(rHigh),abs(rLow)) # allows dirty AF phase converter
-            cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['blue', 'white', 'red'])
-            cnorm = mcolors.Normalize(vmin=-absMax, vmax=absMax)  # Adjust vmin and vmax as needed
-            ax_colorbar = plt.subplot(gs[1])
-            cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(norm=cnorm, cmap=cmap),
+            if allReal:
+                rHigh = max(np.real(state))
+                rLow = min(np.real(state))
+                absMax = max(abs(rHigh),abs(rLow)) # allows dirty AF phase converter
+                cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap1', ['blue', 'white', 'red'])
+                cnorm = mcolors.Normalize(vmin=-absMax, vmax=absMax)
+                ax_colorbar = plt.subplot(gs[1])
+                cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(norm=cnorm, cmap=cmap),
                             cax=ax_colorbar, orientation='vertical')
-            cbar.set_label('Wave Function Amplitude')
+                cbar.set_label(scaleName)
+            else:
+                norms = np.abs(state)
+                phases = np.angle(state)+np.pi
+                max_norm = np.max(norms)
+                absMax = max_norm
+                norms /= max_norm
+                cnorm = mcolors.Normalize(vmin=0, vmax=np.pi*2)
+                cmap = 'hsv'
+                ax_colorbar = plt.subplot(gs[1])
+                cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(norm=cnorm,cmap=cmap),cax=ax_colorbar,orientation='vertical')
+                cbar.set_label(scaleName)
     else: # band
         if doLog:
             ncut = 5E-5
             state = np.maximum(state,ncut)
             absMax = max(state)
             cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['white', 'red'])
-            cnorm = mcolors.LogNorm(vmin=ncut, vmax=absMax)  # Adjust vmin and vmax as needed
+            cnorm = mcolors.LogNorm(vmin=ncut, vmax=absMax)
             ax_colorbar = plt.subplot(gs[1])
             cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(norm=cnorm, cmap=cmap),
                                 cax=ax_colorbar, orientation='vertical')
@@ -254,7 +267,7 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
             rHigh = max(state)
             absMax = rHigh
             cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['white', 'red'])
-            cnorm = mcolors.Normalize(vmin=0, vmax=rHigh)  # Adjust vmin and vmax as needed
+            cnorm = mcolors.Normalize(vmin=0, vmax=rHigh)
             ax_colorbar = plt.subplot(gs[1])
             cbar = plt.colorbar(mappable=plt.cm.ScalarMappable(norm=cnorm, cmap=cmap),
                             cax=ax_colorbar, orientation='vertical')
@@ -274,8 +287,11 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
         if np.sum(adj[j]) == 0:
             continue  # dead vertices states that override white
         # mapval = np.square(np.abs(e_vec[j, i]))
-        mapval = state[j]
-        circ = plt.Circle((uni[j][0], uni[j][1]), .35+.25*abs(mapval)/absMax, facecolor=cmap(cnorm(mapval)),zorder=10,edgecolor='black', linewidth=.5)
+        if not allReal:
+            circ = plt.Circle((uni[j][0], uni[j][1]), .15+.55*norms[j], facecolor=mcolors.hsv_to_rgb((phases[j]/2/np.pi,1,1)),zorder=10,edgecolor='black', linewidth=.5)
+        else:
+            mapval = state[j]
+            circ = plt.Circle((uni[j][0], uni[j][1]), .35+.25*abs(mapval)/absMax, facecolor=cmap(cnorm(mapval)),zorder=10,edgecolor='black', linewidth=.5)
         ax_main.add_patch(circ)
 
     plt.tight_layout()
@@ -286,7 +302,7 @@ def drawIndivState(filename,plotnamein,fout,adj,uni,state,wfc=True,doLog=False):
     ax_main.set_title(plotnamein, fontsize=12)
     plt.savefig(str(filename) + "\\" + str(ncut) + fout + "_" + '.png', dpi=400)
 
-def drawSpectra(gam,posi,fname,makeHistogram):
+def drawSpectra(gam,posi,fname,fout,makeHistogram):
     plt.close('all')
     x = np.linspace(min(posi) - 1, max(posi) + 1, 1000)
     big_function = np.zeros_like(x)
@@ -299,7 +315,7 @@ def drawSpectra(gam,posi,fname,makeHistogram):
     plt.xlim(min(x)-.5, max(x)+.5)
     plt.ylim(0,max(big_function)*1.1)
     plt.title('Smoothed Density of States ($\gamma$ = ' + str(np.round(gam,3)) + ")")
-    plt.savefig(fname + "\\" + fname + "_EigVals_" + str(np.round(gam,3)) + ".png",dpi=400)
+    plt.savefig(fname + "\\" + fout + "_EigVals_" + str(np.round(gam,3)) + ".png",dpi=400)
     plt.cla()
     if makeHistogram:
         width = 0.01
@@ -318,6 +334,7 @@ def drawSpectra(gam,posi,fname,makeHistogram):
 def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBands=False, bandsIn=[1, 4, 8, 16, 24, 32],
                lowE=0, highE=40, S_mat=None,gammas=list(np.linspace(0.001,1,20)),defects=False):
     # strip dead states
+    isReal = np.allclose(adj,adj.T)
     row_sums = np.sum(adj, axis=1)
     col_sums = np.sum(adj, axis=0)
     if defects:
@@ -328,7 +345,7 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
                       i not in defectList and (abs(int(x)) == 2 or abs(int(x)) == 3 or abs(int(x)) == 4)]
     else:
         valid_rows = np.where(row_sums != 0)[0]
-        valid_cols = np.where(col_sums != 0)[0] # TODO
+        valid_cols = np.where(col_sums != 0)[0]
     print("Plotted Vertices",len(valid_rows))
     print("Row Validity:",np.allclose(valid_rows,valid_cols))
     adjNew = adj[valid_rows][:, valid_cols]
@@ -340,7 +357,6 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
     # diagonalize
     start_time = time.time()
     if S_mat is None:
-
         e_values, e_vec = np.linalg.eigh(adjNew)
         # sparse_adjNew = csc_matrix(adjNew)
         # e_values, e_vec = scipy_eigsh(sparse_adjNew)
@@ -349,7 +365,7 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
     # expects adj to have negative hops, diagonal energy
     end_time = time.time()
     tictoc = end_time - start_time
-    print("Diagonalizing Time:",tictoc)
+    print("Diagonalizing Time:",np.round(tictoc,2))
     plt.cla()
     # States
     makeIndivGraphs = drawIndivs
@@ -365,13 +381,13 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
     positions = e_values
     if makeSpectrum:
         for gamma in gammas:
-            drawSpectra(gamma,positions,filename,True)
+            drawSpectra(gamma,positions,filename,filename,True)
     if makeIndivGraphs:
         for i in range(lowE, min(highE, len(e_values))):
             plotname = "Eigenstate: " + str(i+1)+", Energy: " + "{:.3f}".format(e_values[i]) + "$\mathit{t}$"
+            print("Is Real:",isReal)
             fout = 'Lin_' + str(i+1) + '_e_' + "{:.3f}".format(e_values[i])
             drawIndivState(filename,plotname,fout,adjNew,uniNew,e_vec[:,i],wfc=True,doLog=False)
-
             fout = "Log_" + str(i+1) + '_e_' + "{:.3f}".format(e_values[i])
             drawIndivState(filename,plotname,fout,adjNew,uniNew,e_vec[:,i],wfc=True,doLog=True)
     if makeBand:
@@ -387,6 +403,7 @@ def drawStates(adj, uni, filename, drawSpectrum=False, drawIndivs=False, drawBan
             drawIndivState(filename,plotname,fout,adjNew,uniNew,mapval,wfc=False,doLog=True)
             fout = "Lin_Bands_" + '_' + str(lowE) + "." + str(bandopt)
             drawIndivState(filename, plotname, fout, adjNew, uniNew, mapval, wfc=False, doLog=False)
+
 """This block of code finds the conditions (ie number of each metatile type) under which all the edges will be able to wrap.
 I then realized this is not useful because it creates hexagons which have 3 neighbors on a single vertex which is unphysical.
 This code solves the Sympy equations and then exists. It is entirely standalone and exits the program upon completion."""
@@ -444,9 +461,9 @@ recursions =3  # DEFAULT: 3 This is how big it goes. 1,2 don't work for an unkno
 doWrap = False  # DEFAULT: FALSE If the patch is balanced (mistaken belief, see description of solveBalancedPatch above)
 tileConnect = True  # DEFAULT: TRUE Whether to connect the tiles together along vertices. This is assumed true for much of the program, so be EXTREMELY careful if false
 # superfilename # This will be defined after iList is defined, but it's where most files get saved, so just know it exists
-iList = 2  # DEFAULT 2 (19-tile patch with all possible 15 types) which set of patches - see ILIST SECTION below for choices / modifications - (all work for 3,4 recursions, 10+ should be used only with 4)
+iList = 3 # DEFAULT 2 (19-tile patch with all possible 15 types) which set of patches - see ILIST SECTION below for choices / modifications - (all work for 3,4 recursions, 10+ should be used only with 4)
 # DISPLAYING HEXAGONS
-showHexagons = True  # Whether to show the metatiles, the next few don't matter if not showHexagons
+showHexagons = True  # DEFAULT: TRUE Whether to show the metatiles, the next few don't matter if not showHexagons
 showIndex = True # DEFAULT: TRUE Whether to show the metatile indices (purely aesthetic or for verifying you selected the right patch)
 showEdgeLabels = True  # DEFAULT: TRUE whether to show edge labels (purely aesthetic)
 yesRotate = True  # DEFAULT: TRUE whether to rotate tile labels (purely aesthetic)
@@ -468,20 +485,21 @@ doSanityChecks = False # DEFAULT: FALSE prints out some data on metascheme
 doHypothesis = False # DEFAULT: FALSE verifies key data to meta/superschemes
 doTileNorm = False # DEFAULT: FALSE computes a ton of tilenorms for making sure things work
 generateTree = False  # DEFAULT: FALSE does hierarchical tree analysis
-doDoubleWeighting = True  # DEFAULT: TRUE save plots showing the weight on each type of vertex
+doDoubleWeighting = False # DEFAULT: FALSE save plots showing the weight on each type of vertex
 localChern = False  # DEFAULT: FALSE
+doLandau = True # DEFAULT: FALSE makes complex phase for landau gauge
 N_vals = 2  # DEFAULT: 2 number of "orbitals" per tile in the metascheme
 doDefects = False # DEFAULT: FALSE removes the vertices at the indices specified in defectList in file translated.py for computations (but not display)
 # MISC TERMINAL SECTION
 doA2222Scheme = False  # DEFAULT: FALSE EXITS PROGRAM ON COMPLETION tries to self-consistently solve for t_a, A, e_A, E by looking at all possible configurations of 7 and solving 37 equations
 doGammaGammaScheme = True  # DEFAULT: TRUE key to super scheme, finds 15 edge types and then assigns hopping values and runs TB on the hexagons with these values
-hexTB = False  # DEFAULT: FALSE if doGammaGammaScheme: computes the supervertex model with the 15 types (good data), saves to HexHopStates (good)
-               #                else: does the supervertex model but the hoppings are from suspicious solutions from A2222 previous results or handpicked, saves to HexStates (bad)
+hexTB = False  #  DEFAULT: FALSE if doGammaGammaScheme: computes the supervertex model with the 15 types (good data), saves to HexHopStates (good)
+               #                 else: does the supervertex model but the hoppings are from suspicious solutions from A2222 previous results or handpicked, saves to HexStates (bad)
 doCrystallography = False  # DEFAULT: FALSE, EXITS UPON COMPLETION, stores file to superfilename with FT of patch
 doGraphene = False  # DEFAULT: FALSE EXITS UPON COMPLETION, solves graphene TB model on just ind_list sites (times 2)
 doSingleSpectre = False  # DEFAULT: FALSE EXITS UPON COMPLETION, draws states for single spectre, just a cycle graph
 # EIGENSTATE GENERATION
-doVertexStates = True  # DEFAULT TRUE calculates states of all the vertices in H_tot (totalAdj)
+doVertexStates = False  # DEFAULT TRUE calculates states of all the vertices in H_tot (totalAdj)
 doSpectrum = True  # DEFAULT: TRUE draws out the spectra the specified smoothing parameters (gammas), exact DOS too
 gammasIn = list(np.geomspace(.001, .5, 20))  # DEFAULT some values between 0.001 and .5, smoothing params
 doIndivs = True  # DEFAULT: TRUE draws individual eigenstates with high quality graphing in superfilename, takes up to 1minute per state for very large patches
@@ -489,9 +507,11 @@ stateNumLow = 0  # DEFAULT: 0 the lowest state drawn if doIndivs
 stateNumHigh = 20  # DEFAULT: 20 the highest state drawn if doIndivs
 doBands = False  # DEFAULT: FALSE prints out the density plots for all the fillings in bandList, WARNING if any itme is larger than Active Vertices, will break
 bandList = [4, 8, 16, 24, 32, 64, 128, 256]
-
+phaseShift = np.pi/2
 """Most Useful Configurations
-All default: uses standard 19 tile patch, makes images of vertices/metatiles/graph of edge weights, prints out some key details, saves the first 20 states in Patch2Connect_True
+All default: uses standard 19 tile patch, makes images of vertices/metatiles, prints out some key details, saves the first 20 states in Patch2Connect_True
+
+
 
 End Hyperparamter Section"""
 
@@ -1376,7 +1396,7 @@ if doProjections and not hexOnly:
                 vacHold += 1
         # print("Rank",np.linalg.matrix_rank(output),vacHold,prerank)
         projectStates[ind] = output
-        projectStates[ind][:, 0] = np.abs(projectStates[ind][:, 0])  # define ground to be positive phase for ansatz TODO be careful with complex
+        # projectStates[ind][:, 0] = np.abs(projectStates[ind][:, 0])  # define ground to be positive phase for ansatz
         if drawProjectors:
             fname = "Projector_Patch" + str(iList) + "_Tile" + str(ind) + "_" + centers[ind][1]
             if not os.path.exists(fname):
@@ -1455,7 +1475,7 @@ if doProjections and not hexOnly:
         # compute the meta spectrum/states
         print("Starting Computations...")
         print("Diagonalizing H_meta...")
-        e_values, e_vecs = scipy_eig(t_matrix, overlapMatrix)
+        e_values, e_vecs = scipy_eigh(t_matrix, overlapMatrix)
         idx = e_values.argsort()
         metaSpectrum = e_values[idx]
         metaStates = e_vecs[:, idx]
@@ -1815,36 +1835,113 @@ if doProjections and not hexOnly:
                 psi = totalStates[:,test]
                 print("Testing Eigval",test," Gap:",np.abs(np.dot(np.conj(psi),np.dot(-sAdj,psi))-totalSpectrum[test]))
 
-        # TODO NOT REAL LINEAR ALGEBRA, SECTIONS BELOW NOT VERIFIED
-        # <psi_tot|psi_{alpha}_{J}> = sum_i(sum_J(sum_alpha(<psi_tot|i><i|phi_j_alpha><phi_j_alpha|psi_tile>)))
-        # looking at the overlap is kind of meaningless because not squared I think
-        doOverlap = False
-        if doOverlap:
-            state = 0
-            Tform = np.zeros((len(totalVertices), indSize * N_vals))
-            for i in range(len(totalVertices)):
-                for j in range(indSize * N_vals):
-                    Tform[i, j] = projectStates[ind_list[j // N_vals]][i, j % N_vals]
-            for state in range(N_vals):
-                sum = np.dot(np.dot(totalStates[:, state], Tform), metaStates[:, state])
-                print("OVERLAP in state " + str(state) + ": " + str(sum))
-
         # needs flux threading and magnetization to work
+        cname = "ChernLocal_"+str(iList)
         if localChern:
-            X = np.zeros((totalSize, totalSize))
-            Y = np.zeros((totalSize, totalSize))
-            for i in range(totalSize):
-                X[i, i] = totalVertices[i][0]
-                Y[i, i] = totalVertices[i][1]
-            e_cut = .5
-            P = np.zeros((totalSize, totalSize))
-            for state in range(totalSize):
-                if totalSpectrum[state] > e_cut:
-                    P += np.outer(totalStates[:, state], np.conj(totalStates[:, state]))
-            Q = np.identity(totalSize) - P
-            C = 2 * np.pi * 1j * (
-                        np.dot(np.dot(np.dot(np.dot(P, X), Q), Y), P) - np.dot(np.dot(np.dot(np.dot(P, Y), Q), X), P))
-            print(C)
+            if not os.path.exists(cname):
+                os.makedirs(cname)
+            # make hermitian phase hamiltonian
+            area = 8.19615
+            phi_0 = 1 # flux quantum
+            phi = .25
+            print("Relative Phase:",phi)
+            H_b = np.zeros_like(sAdj, dtype=complex)
+            for x in range(sSize):
+                px = sVert[x]
+                for y in range(sSize):
+                    py = sVert[y]
+                    phase = np.pi * 2 * 1j * phi / phi_0 * (px[0] - py[0]) * (px[1] + py[1]) / area
+                    H_b[x, y] = -sAdj[x, y] * np.exp(phase)
+            e_values, e_vec = np.linalg.eigh(H_b)
+            # make projectors
+            X = np.zeros((sSize,sSize))
+            Y = np.zeros((sSize,sSize))
+            Xtild = np.zeros((sSize, sSize),dtype=complex)
+            Ytild = np.zeros((sSize, sSize),dtype=complex)
+            for i in range(sSize):
+                X[i, i] = sVert[i][0]
+                Y[i, i] = sVert[i][1]
+            e_cut = -2.35
+            stateList = np.where(e_values < e_cut)[0].tolist()
+            stateList = [0]
+            print(len(stateList),stateList)
+            P = np.zeros((sSize,sSize),dtype=complex)
+            for state in stateList:
+                P += np.outer(e_vec[:, state], np.conj(e_vec[:, state]))
+            # start = time.time()
+            # # Xmat = np.zeros_like(X)
+            # # Ymat = np.zeros_like(Y)
+            # for i in range(sSize):
+            #     for j in range(sSize):
+            #         for state in range(sSize):  # TODO incredibly slow
+            #             Xtild[i,j] += P[i,state]*X[state,state]*P[state,j]
+            # #             Ytild[i,j] += P[i,state]*Y[state,state]*P[state,j]
+            # # end = time.time()
+            # print("FUll:",end-start)
+            # print(np.allclose(Xtild,np.dot(np.dot(P,X),P)),np.allclose(Ytild,np.dot(np.dot(P,Y),P)))
+            start = time.time()
+            Xtild = np.dot(np.dot(P,X),P)
+            Ytild = np.dot(np.dot(P,Y),P)
+            end = time.time()
+            print("DOT:",end-start)
+            realChern = np.zeros((sSize),dtype=complex)
+            for i in range(sSize): # from resta paper https://arxiv.org/pdf/1111.5697.pdf
+                for k in range(sSize):
+                    realChern[i] += Xtild[i,k]*Ytild[k,i]-Ytild[i,k]*X[k,i]
+            realChern *= -2j*np.pi
+            realChern = np.imag(realChern)
+            drawIndivState(cname,"Local Chern Number","Chern_"+str(len(stateList)),sAdj,sVert,realChern,scaleName="Local Chern Number")
+        if doLandau:
+            area = 8.19615
+            phi_0 = 1 # flux quantum
+            fluxi = 26
+            phi_tests = np.linspace(0,1,fluxi)
+            gamma = [.010]
+            print("")
+            landaufname = "BField_" + str(iList)
+            if not os.path.exists(landaufname):
+                os.makedirs(landaufname)
+            hofstad = np.zeros((fluxi,sSize))
+            for i,phi in enumerate(phi_tests):
+                H_b = np.zeros_like(sAdj,dtype=complex)
+                for x in range(sSize):
+                    px = sVert[x]
+                    for y in range(sSize):
+                        py = sVert[y]
+                        phase = np.pi*2*1j*phi/phi_0*(px[0]-py[0])*(px[1]+py[1])/area
+                        H_b[x,y] = -sAdj[x,y]*np.exp(phase)
+                print("Phase:",np.round(phi,3))
+                # print("Hermitian:",np.allclose(H_b,H_b.conj().T))
+                e_values, e_vec = np.linalg.eigh(H_b)
+                hofstad[i] = e_values
+                # for g in gamma:
+                #     drawSpectra(g,e_values,landaufname,"_"+str(np.round(phi,3)),False)
+                for j,eig in enumerate(e_values):
+                    if abs(eig) < .01:
+                        if abs(eig) < .001:
+                            drawIndivState(landaufname,"Zero Mode, Flux " + str(np.round(phi,3)),"Zero_"+str(np.round(phi,3))+"_"+str(j),sAdj,sVert,e_vec[:,j],allReal=False,scaleName="Phase Angle")
+                        else:
+                            drawIndivState(landaufname,"Near Zero Mode, Flux " + str(np.round(phi,3)),"NearZero_"+str(np.round(phi,3))+"_"+str(j),sAdj,sVert,e_vec[:,j],allReal=False,scaleName="Phase Angle")
+
+            butterfly = np.zeros((fluxi,fluxi))
+            maxSpec = np.max(hofstad)
+            hofstad /= maxSpec*2.01
+            hofstad += .5
+            for x in range(fluxi):
+                for y in range(sSize):
+                    val = hofstad[x,y]
+                    butterfly[x,int(np.floor(fluxi*val))] += 1
+            plt.close('all')
+            cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['white', 'blue'])
+            plt.imshow(butterfly, cmap=cmap,vmin=0,vmax=np.max(butterfly))
+            cbar = plt.colorbar()  # Add a colorbar to show the color-to-value mapping
+            cbar.set_label("Density of States")
+            plt.title("Hofstadter's Butterfly for Landau Gauge")
+            plt.ylabel("Energy")
+            plt.xlabel("Phase")
+            plt.yticks([0, fluxi-1], [np.round(maxSpec,3),-np.round(maxSpec,3)])
+            plt.xticks([0, fluxi-1], [0,1])
+            plt.savefig(landaufname + "\\HofstadterButterfly_" + str(fluxi)+ '.png')
 
         # actually computes the values that pasted into a dict earlier with t_i = <Psi_A_oriA|H_tot|Psi_B_oriB> (ie directly from t_matrix)
         recomputeGammaGamma = False
@@ -1873,6 +1970,20 @@ if doProjections and not hexOnly:
                         gdict[conjLabel(ul)].append((edgeI, val, sval,ind,one))
             for key in gdict:
                 print(key, gdict[key])
+
+        # TODO NOT REAL LINEAR ALGEBRA, SECTIONS BELOW NOT VERIFIED
+        # <psi_tot|psi_{alpha}_{J}> = sum_i(sum_J(sum_alpha(<psi_tot|i><i|phi_j_alpha><phi_j_alpha|psi_tile>)))
+        # looking at the overlap is kind of meaningless because not squared I think
+        doOverlap = False
+        if doOverlap:
+            state = 0
+            Tform = np.zeros((len(totalVertices), indSize * N_vals))
+            for i in range(len(totalVertices)):
+                for j in range(indSize * N_vals):
+                    Tform[i, j] = projectStates[ind_list[j // N_vals]][i, j % N_vals]
+            for state in range(N_vals):
+                sum = np.dot(np.dot(totalStates[:, state], Tform), metaStates[:, state])
+                print("OVERLAP in state " + str(state) + ": " + str(sum))
 
         # TODO USES WRONG LINALG
         # <Psi_tot_n|Psi_super_n> and plot it by multiplying each |Psi_A> by <Psi_A|Psi_Super>, comparing to |Psi_tot>
