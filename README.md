@@ -11,6 +11,7 @@ The code is also able to generate each eigenstate for each patch and display the
 ![alt text](https://github.com/connorblake1/spectre/blob/master/tb.png?raw=true)
 ![alt text](https://github.com/connorblake1/spectre/blob/master/tb2.png?raw=true)
 ![alt text](https://github.com/connorblake1/spectre/blob/master/landau.png?raw=true)
+An explanation of the notation and graphs can be found in the provisional writeup in this repo.
 
 # How to Use
 Each of the following files should have its own configuration where you can run it: main.py, meta.py, superpack.py, phaseinverter.py, gifer.py, pdfbuilder.py, metasolve.py, oldmain.py. translated.py holds only import statements and a wide range of aux. functions.
