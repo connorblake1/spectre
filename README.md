@@ -1,4 +1,16 @@
 # The Spectre
+# Some Results
+The code can be used to generate arbitrarily sized "patches" of metatiles and display them in various forms. Shown here, in order, are "raw vertex", "colored metatile", and "pairs forms".
+
+![alt text](https://github.com/connorblake1/spectre/blob/master/demo_images/rawvertex.jpg?raw=true)
+![alt text](https://github.com/connorblake1/spectre/blob/master/demo_images/metatiles.jpg?raw=true)
+![alt text](https://github.com/connorblake1/spectre/blob/master/demo_images/pairs.jpg?raw=true)
+
+The code is also able to generate each eigenstate for each patch and display them via both tight-binding and Landau-gauge Hamiltonians.
+
+![alt text](https://github.com/connorblake1/spectre/blob/master/demo_images/tb.jpg?raw=true)
+![alt text](https://github.com/connorblake1/spectre/blob/master/demo_images/landau.jpg?raw=true)
+
 # How to Use
 Each of the following files should have its own configuration where you can run it: main.py, meta.py, superpack.py, phaseinverter.py, gifer.py, pdfbuilder.py, metasolve.py, oldmain.py. translated.py holds only import statements and a wide range of aux. functions.
 
