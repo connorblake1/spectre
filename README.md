@@ -1,4 +1,5 @@
 # The Spectre
+See TheSpectre9.12.23.pdf for a writeup.
 # Some Results
 The code can be used to generate arbitrarily sized "patches" of metatiles and display them in various forms. Shown here, in order, are "raw vertex", "colored metatile", and "pairs forms".
 
